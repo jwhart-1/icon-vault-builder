@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
 import { IconMetadataForm } from './IconMetadataForm';
@@ -20,7 +19,7 @@ export const IconCard: React.FC<IconCardProps> = ({
   isLoading = false,
 }) => {
   const [showForm, setShowForm] = useState(false);
-  const [show/> = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const handleSave = (updatedIcon: ExtractedIcon) => {
     onSave(updatedIcon);
