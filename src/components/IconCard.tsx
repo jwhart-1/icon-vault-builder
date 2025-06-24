@@ -17,110 +17,188 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
   name, 
   size = 120 
 }) => {
-  // Enhanced debug logging
-  console.log(`=== SVGIcon Debug for ${name} ===`);
-  console.log('Has content:', !!svgContent);
+  // DIAGNOSTIC LOGGING - Remove after fixing
+  console.log(`🔍 DIAGNOSING ${name}:`);
+  console.log('SVG Content:', svgContent);
   console.log('Content length:', svgContent?.length);
-  console.log('First 200 chars:', svgContent?.substring(0, 200));
-  console.log('Starts with <svg:', svgContent?.startsWith('<svg'));
+  console.log('Contains <svg>:', svgContent?.includes('<svg>'));
   console.log('Contains </svg>:', svgContent?.includes('</svg>'));
-  console.log('================================');
+  console.log('Contains viewBox:', svgContent?.includes('viewBox'));
+  console.log('Contains path:', svgContent?.includes('<path'));
+  console.log('Contains fill:', svgContent?.includes('fill='));
+  console.log('Full content:', svgContent);
+  console.log('-------------------');
 
-  if (!svgContent || svgContent.trim().length === 0) {
+  if (!svgContent) {
     return (
-      <div className="flex flex-col items-center justify-center text-slate-400 text-sm h-full">
-        <div className="text-2xl mb-2">📄</div>
-        <div>No Content</div>
+      <div className="w-full h-full bg-red-100 flex items-center justify-center text-red-600 text-xs">
+        No SVG Content
       </div>
     );
   }
 
   try {
-    // Clean and prepare SVG content
-    let cleanSvg = svgContent.trim();
-    
-    // Ensure SVG has proper structure
-    if (!cleanSvg.startsWith('<svg')) {
-      console.error(`Invalid SVG for ${name}: doesn't start with <svg>`);
-      throw new Error('Invalid SVG structure');
-    }
-
-    // Parse the SVG to validate and enhance it
+    // Parse the SVG
     const parser = new DOMParser();
-    const doc = parser.parseFromString(cleanSvg, 'image/svg+xml');
-    
-    // Check for parser errors
-    const parseError = doc.querySelector('parsererror');
-    if (parseError) {
-      console.error(`SVG Parse error for ${name}:`, parseError.textContent);
-      throw new Error('SVG parsing failed');
-    }
-
+    const doc = parser.parseFromString(svgContent, 'image/svg+xml');
     const svgElement = doc.documentElement;
-    
+
     if (svgElement.tagName !== 'svg') {
-      console.error(`Not an SVG element for ${name}:`, svgElement.tagName);
       throw new Error('Not a valid SVG');
     }
 
-    // Enhance SVG for better visibility
+    // Force visibility with aggressive styling
     svgElement.setAttribute('width', size.toString());
     svgElement.setAttribute('height', size.toString());
+    svgElement.setAttribute('fill', 'black'); // Force black fill
+    svgElement.setAttribute('stroke', 'black'); // Force black stroke
     svgElement.style.display = 'block';
-    svgElement.style.maxWidth = '100%';
-    svgElement.style.maxHeight = '100%';
+    svgElement.style.width = `${size}px`;
+    svgElement.style.height = `${size}px`;
 
-    // Ensure visibility - add fill if none exists
-    const allPaths = svgElement.querySelectorAll('path, circle, rect, polygon, line, ellipse');
-    let hasVisibleElements = false;
-    
-    allPaths.forEach(element => {
-      const fill = element.getAttribute('fill');
-      const stroke = element.getAttribute('stroke');
-      
-      if (!fill && !stroke) {
-        element.setAttribute('fill', 'currentColor');
-        hasVisibleElements = true;
-      } else if (fill !== 'none' || stroke) {
-        hasVisibleElements = true;
-      }
+    // Find all drawing elements and force visibility
+    const drawingElements = svgElement.querySelectorAll('path, circle, rect, polygon, line, ellipse, g');
+    drawingElements.forEach((element) => {
+      // Remove any invisible attributes
+      element.removeAttribute('fill');
+      element.removeAttribute('opacity');
+      element.setAttribute('fill', 'currentColor');
+      element.setAttribute('stroke', 'currentColor');
+      element.setAttribute('stroke-width', '1');
+      element.style.opacity = '1';
+      element.style.visibility = 'visible';
     });
 
-    if (!hasVisibleElements) {
-      // If no visible elements found, set fill on the SVG itself
-      svgElement.setAttribute('fill', 'currentColor');
-    }
-
-    const finalSvg = svgElement.outerHTML;
-    console.log(`Successfully processed SVG for ${name}, final length: ${finalSvg.length}`);
+    // Also check for nested groups
+    const groups = svgElement.querySelectorAll('g');
+    groups.forEach(group => {
+      group.style.opacity = '1';
+      group.style.visibility = 'visible';
+      group.removeAttribute('opacity');
+    });
 
     return (
       <div 
-        className="flex items-center justify-center w-full h-full text-slate-700"
+        className="flex items-center justify-center border border-gray-300 text-slate-700"
         style={{ 
           width: `${size}px`, 
           height: `${size}px`,
-          minWidth: `${size}px`,
-          minHeight: `${size}px`
+          backgroundColor: '#f9f9f9' // Light background to see if anything renders
         }}
-        dangerouslySetInnerHTML={{ __html: finalSvg }}
+        dangerouslySetInnerHTML={{ __html: svgElement.outerHTML }}
       />
     );
 
   } catch (error) {
-    console.error(`Failed to render SVG for ${name}:`, error);
-    console.log(`SVG content that failed:`, svgContent?.substring(0, 500));
-    
+    console.error(`SVG Render Error for ${name}:`, error);
     return (
-      <div className="flex flex-col items-center justify-center text-red-400 text-sm h-full">
-        <div className="text-2xl mb-2">⚠️</div>
-        <div className="text-center">
-          <div>Render Error</div>
-          <div className="text-xs mt-1">{error.message}</div>
+      <div className="w-full h-full bg-yellow-100 flex items-center justify-center text-yellow-800 text-xs text-center p-2">
+        <div>
+          <div>Parse Error</div>
+          <div className="text-xs">{error.message}</div>
         </div>
       </div>
     );
   }
+};
+
+const SVGIconDataURL: React.FC<{ svgContent: string; name: string; size?: number }> = ({ 
+  svgContent, 
+  name, 
+  size = 120 
+}) => {
+  const [imgSrc, setImgSrc] = useState<string>('');
+  const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    if (svgContent) {
+      try {
+        // Create a clean SVG with forced visibility
+        let cleanSvg = svgContent;
+        
+        // Add xmlns if missing
+        if (!cleanSvg.includes('xmlns=')) {
+          cleanSvg = cleanSvg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+        }
+        
+        // Force black fill for testing
+        cleanSvg = cleanSvg.replace(/fill="[^"]*"/g, 'fill="black"');
+        cleanSvg = cleanSvg.replace(/stroke="[^"]*"/g, 'stroke="black"');
+        
+        // Create data URL
+        const svgBlob = new Blob([cleanSvg], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        setImgSrc(url);
+
+        return () => URL.revokeObjectURL(url);
+      } catch (err) {
+        setError(err.message);
+      }
+    }
+  }, [svgContent]);
+
+  if (error) {
+    return <div className="text-red-500 text-xs">{error}</div>;
+  }
+
+  if (!imgSrc) {
+    return <div className="text-gray-500 text-xs">Loading...</div>;
+  }
+
+  return (
+    <img 
+      src={imgSrc}
+      alt={name}
+      style={{ 
+        width: `${size}px`,
+        height: `${size}px`,
+        border: '1px solid #ccc'
+      }}
+      onError={() => setError('Image failed to load')}
+    />
+  );
+};
+
+const RawSVGTest: React.FC<{ icon: ExtractedIcon }> = ({ icon }) => {
+  return (
+    <div className="border-2 border-blue-500 p-4 m-2">
+      <h3 className="font-bold">{icon.name}</h3>
+      <div className="text-sm mb-2">
+        <div>Content Length: {icon.svgContent?.length}</div>
+        <div>File Size: {icon.fileSize} bytes</div>
+      </div>
+      
+      {/* Raw SVG display */}
+      <div className="mb-4">
+        <div className="text-xs font-semibold mb-1">Raw SVG Content:</div>
+        <textarea 
+          className="w-full h-20 text-xs font-mono border p-1"
+          value={icon.svgContent || ''}
+          readOnly
+        />
+      </div>
+      
+      {/* Direct HTML injection */}
+      <div className="mb-4">
+        <div className="text-xs font-semibold mb-1">Direct HTML Injection:</div>
+        <div 
+          className="w-24 h-24 border bg-white flex items-center justify-center"
+          dangerouslySetInnerHTML={{ __html: icon.svgContent || '' }}
+        />
+      </div>
+      
+      {/* Simple black test */}
+      <div className="mb-4">
+        <div className="text-xs font-semibold mb-1">Forced Black Fill:</div>
+        <div 
+          className="w-24 h-24 border bg-white flex items-center justify-center"
+          dangerouslySetInnerHTML={{ 
+            __html: icon.svgContent?.replace(/fill="[^"]*"/g, 'fill="black"').replace(/stroke="[^"]*"/g, 'stroke="black"') || '' 
+          }}
+        />
+      </div>
+    </div>
+  );
 };
 
 export const IconCard: React.FC<IconCardProps> = ({
@@ -132,6 +210,7 @@ export const IconCard: React.FC<IconCardProps> = ({
 }) => {
   const [showForm, setShowForm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
 
   // Add comprehensive debugging at component level
   console.log(`=== IconCard Debug for ${icon.name} ===`);
@@ -182,6 +261,18 @@ export const IconCard: React.FC<IconCardProps> = ({
         />
       </div>
 
+      {/* Alternative rendering for debugging */}
+      <div className="mb-4">
+        <div className="text-xs font-semibold mb-2">Alternative Rendering:</div>
+        <div className="bg-white rounded border p-2 flex items-center justify-center" style={{ height: '80px' }}>
+          <SVGIconDataURL 
+            svgContent={icon.svgContent} 
+            name={icon.name}
+            size={60}
+          />
+        </div>
+      </div>
+
       {/* Icon Info */}
       <div className="space-y-2">
         <h3 className="font-semibold text-slate-800 truncate" title={icon.name}>
@@ -223,6 +314,14 @@ export const IconCard: React.FC<IconCardProps> = ({
           title="Preview"
         >
           <Eye className="h-4 w-4" />
+        </button>
+
+        <button
+          onClick={() => setShowDebug(true)}
+          className="p-2 bg-purple-200 text-purple-600 rounded-lg hover:bg-purple-300 transition-colors"
+          title="Debug"
+        >
+          🔧
         </button>
         
         <button
@@ -286,6 +385,25 @@ export const IconCard: React.FC<IconCardProps> = ({
             <div className="bg-slate-100 rounded p-3 text-sm font-mono overflow-auto max-h-40">
               {icon.svgContent}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Debug Modal */}
+      {showDebug && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Debug: {icon.name}</h3>
+              <button
+                onClick={() => setShowDebug(false)}
+                className="text-slate-400 hover:text-slate-600 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <RawSVGTest icon={icon} />
           </div>
         </div>
       )}
