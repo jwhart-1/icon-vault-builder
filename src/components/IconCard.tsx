@@ -53,19 +53,31 @@ export const IconCard: React.FC<IconCardProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  const iconContainerStyle: React.CSSProperties = {
+    width: '100%',
+    height: '100%',
+    maxWidth: '80px',
+    maxHeight: '80px',
+    overflow: 'visible'
+  };
+
+  const previewContainerStyle: React.CSSProperties = {
+    width: '100%',
+    height: '100%',
+    maxWidth: '200px',
+    maxHeight: '200px',
+    overflow: 'visible'
+  };
+
   return (
     <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:shadow-md transition-shadow">
       {/* Icon Preview */}
       <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-4 border min-h-32 relative">
         {icon.svgContent ? (
           <div
-            className="flex items-center justify-center w-full h-full svg-icon-container"
+            className="flex items-center justify-center w-full h-full"
             dangerouslySetInnerHTML={{ __html: icon.svgContent }}
-            style={{ 
-              maxWidth: '80px', 
-              maxHeight: '80px',
-              overflow: 'visible'
-            }}
+            style={iconContainerStyle}
           />
         ) : (
           <div className="flex items-center justify-center w-full h-full text-slate-400 text-sm">
@@ -163,13 +175,9 @@ export const IconCard: React.FC<IconCardProps> = ({
             <div className="bg-slate-50 rounded-lg p-8 mb-4 flex items-center justify-center min-h-48">
               {icon.svgContent ? (
                 <div
-                  className="flex items-center justify-center svg-preview-large"
+                  className="flex items-center justify-center"
                   dangerouslySetInnerHTML={{ __html: icon.svgContent }}
-                  style={{ 
-                    maxWidth: '200px', 
-                    maxHeight: '200px',
-                    overflow: 'visible'
-                  }}
+                  style={previewContainerStyle}
                 />
               ) : (
                 <div className="text-slate-400">No preview available</div>
@@ -183,8 +191,8 @@ export const IconCard: React.FC<IconCardProps> = ({
         </div>
       )}
 
-      <style jsx>{`
-        .svg-icon-container svg {
+      <style>{`
+        .bg-slate-50 svg {
           width: 100% !important;
           height: 100% !important;
           max-width: 80px !important;
@@ -193,7 +201,7 @@ export const IconCard: React.FC<IconCardProps> = ({
           stroke: #1f2937 !important;
         }
         
-        .svg-preview-large svg {
+        .fixed svg {
           width: 100% !important;
           height: 100% !important;
           max-width: 200px !important;
