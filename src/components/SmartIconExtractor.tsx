@@ -38,10 +38,12 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
       innerContent = serializer.serializeToString(element);
     }
     
-    // Create a clean SVG wrapper
-    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${originalViewBox}" fill="currentColor">${innerContent}</svg>`;
+    // Use the original viewBox from the source SVG to maintain proper scaling
+    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${originalViewBox}">${innerContent}</svg>`;
     
-    console.log('Created SVG content preview:', svgContent.substring(0, 200) + '...');
+    console.log('Created standalone icon, content length:', svgContent.length);
+    console.log('ViewBox used:', originalViewBox);
+    console.log('Inner content preview:', innerContent.substring(0, 100) + '...');
     
     return svgContent;
   };
@@ -99,8 +101,8 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
       return icons;
     }
 
-    const viewBox = svgElement.getAttribute('viewBox') || '0 0 24 24';
-    console.log('SVG viewBox:', viewBox);
+    const viewBox = svgElement.getAttribute('viewBox') || '0 0 1000 1000';
+    console.log('Original SVG viewBox:', viewBox);
     
     // Strategy 1: Extract symbols (highest priority)
     setCurrentStrategy('Extracting symbol definitions...');
@@ -142,6 +144,7 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
           const svgWrapper = createStandaloneIcon(group, viewBox);
           
           console.log(`Creating group icon: ${groupId}`);
+          console.log('Group has children:', group.children.length);
           
           icons.push({
             id: `${fileName}-group-${groupId}-${Date.now()}-${index}`,
