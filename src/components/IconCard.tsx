@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
 import { IconMetadataForm } from './IconMetadataForm';
@@ -50,7 +51,7 @@ export const IconCard: React.FC<IconCardProps> = ({
       <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-4 border">
         <div
           className="max-w-full max-h-full flex items-center justify-center"
-          style={{ width: '80px', height: '80px' }}
+          style={{ width: '120px', height: '120px' }}
           dangerouslySetInnerHTML={{ __html: icon.svgContent }}
         />
       </div>
@@ -143,7 +144,7 @@ export const IconCard: React.FC<IconCardProps> = ({
             
             <div className="bg-slate-50 rounded-lg p-8 mb-4 flex items-center justify-center">
               <div
-                className="w-32 h-32 flex items-center justify-center"
+                className="w-48 h-48 flex items-center justify-center"
                 dangerouslySetInnerHTML={{ __html: icon.svgContent }}
               />
             </div>
