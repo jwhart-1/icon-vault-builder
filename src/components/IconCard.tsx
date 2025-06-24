@@ -12,18 +12,93 @@ interface IconCardProps {
   isLoading?: boolean;
 }
 
-// Test SVG component to verify basic SVG rendering works
-const TestSVG = () => (
-  <div className="p-2 border-2 border-green-500 mb-4">
-    <div className="text-xs font-bold mb-1">Test SVG (should show black circle):</div>
-    <div 
-      className="w-16 h-16 border bg-white flex items-center justify-center"
-      dangerouslySetInnerHTML={{ 
-        __html: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="64" height="64"><circle cx="50" cy="50" r="40" fill="black"/></svg>' 
-      }}
-    />
-  </div>
-);
+const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = ({ 
+  svgContent, 
+  name, 
+  size = 120 
+}) => {
+  if (!svgContent) {
+    return (
+      <div className="flex items-center justify-center w-full h-full text-slate-400">
+        No content
+      </div>
+    );
+  }
+
+  try {
+    // Fix the SVG content by replacing problematic values
+    let fixedSvg = svgContent
+      // Replace currentColor with black
+      .replace(/fill="currentColor"/g, 'fill="#000000"')
+      .replace(/stroke="currentColor"/g, 'stroke="#000000"')
+      // Remove any opacity that might make it invisible
+      .replace(/opacity="[^"]*"/g, '')
+      // Remove any visibility hidden
+      .replace(/visibility="hidden"/g, '')
+      // Ensure we have a stroke if no fill
+      .replace(/<path([^>]*?)fill="none"([^>]*?)>/g, '<path$1fill="none" stroke="#000000" stroke-width="1"$2>');
+
+    // Parse and enhance the SVG
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(fixedSvg, 'image/svg+xml');
+    const svgElement = doc.documentElement;
+
+    if (svgElement.tagName !== 'svg') {
+      throw new Error('Invalid SVG');
+    }
+
+    // Set proper dimensions
+    svgElement.setAttribute('width', size.toString());
+    svgElement.setAttribute('height', size.toString());
+    (svgElement as HTMLElement).style.display = 'block';
+
+    // Find all path elements and ensure they're visible
+    const paths = svgElement.querySelectorAll('path');
+    paths.forEach(path => {
+      const currentFill = path.getAttribute('fill');
+      const currentStroke = path.getAttribute('stroke');
+      
+      // If it has currentColor or no fill/stroke, make it black
+      if (currentFill === 'currentColor' || (!currentFill && !currentStroke)) {
+        path.setAttribute('fill', '#000000');
+      }
+      if (currentStroke === 'currentColor') {
+        path.setAttribute('stroke', '#000000');
+      }
+      
+      // Remove problematic attributes
+      path.removeAttribute('opacity');
+      path.removeAttribute('visibility');
+    });
+
+    // Also check groups
+    const groups = svgElement.querySelectorAll('g');
+    groups.forEach(group => {
+      group.removeAttribute('opacity');
+      group.removeAttribute('visibility');
+    });
+
+    return (
+      <div 
+        className="flex items-center justify-center"
+        style={{ 
+          width: `${size}px`, 
+          height: `${size}px`,
+          color: '#000000' // Set context color to black
+        }}
+        dangerouslySetInnerHTML={{ __html: svgElement.outerHTML }}
+      />
+    );
+
+  } catch (error) {
+    console.error(`SVG render error for ${name}:`, error);
+    return (
+      <div className="flex items-center justify-center w-full h-full text-red-500 text-xs">
+        Render error
+      </div>
+    );
+  }
+};
 
 export const IconCard: React.FC<IconCardProps> = ({
   icon,
@@ -33,17 +108,6 @@ export const IconCard: React.FC<IconCardProps> = ({
   isLoading = false,
 }) => {
   const [showForm, setShowForm] = useState(false);
-
-  // Add comprehensive debugging at component level
-  console.log(`=== IconCard Debug for ${icon.name} ===`);
-  console.log('Icon object:', icon);
-  console.log('SVG Content exists:', !!icon.svgContent);
-  console.log('SVG Content length:', icon.svgContent?.length);
-  console.log('SVG Content preview:', icon.svgContent?.substring(0, 200));
-  console.log('Has svg tag:', icon.svgContent?.includes('<svg'));
-  console.log('Has closing svg tag:', icon.svgContent?.includes('</svg>'));
-  console.log('Full SVG Content:', icon.svgContent);
-  console.log('==============================');
 
   const handleSave = (updatedIcon: ExtractedIcon) => {
     onSave(updatedIcon);
@@ -72,94 +136,20 @@ export const IconCard: React.FC<IconCardProps> = ({
     <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:shadow-md transition-shadow">
       <h3 className="font-bold mb-2 text-slate-800">{icon.name}</h3>
       
-      {/* Test SVG to verify rendering works */}
-      <TestSVG />
-      
-      {/* RAW SVG CONTENT DISPLAY */}
-      <div className="mb-4">
-        <div className="text-xs font-bold mb-1">Raw SVG Content (first 500 chars):</div>
-        <textarea 
-          className="w-full h-32 text-xs font-mono border p-2 bg-gray-100"
-          value={icon.svgContent?.substring(0, 500) || 'NO CONTENT'}
-          readOnly
+      {/* Icon Preview */}
+      <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-8 border">
+        <SVGIcon 
+          svgContent={icon.svgContent} 
+          name={icon.name}
+          size={120}
         />
       </div>
       
-      {/* FULL SVG CONTENT DISPLAY */}
-      <div className="mb-4">
-        <div className="text-xs font-bold mb-1">Full SVG Content:</div>
-        <textarea 
-          className="w-full h-40 text-xs font-mono border p-2 bg-gray-50"
-          value={icon.svgContent || 'NO CONTENT'}
-          readOnly
-        />
-      </div>
-      
-      {/* SVG STATS */}
-      <div className="text-xs mb-4 space-y-1 bg-blue-50 p-2 rounded">
-        <div><strong>Content Length:</strong> {icon.svgContent?.length || 0}</div>
-        <div><strong>Has &lt;svg&gt;:</strong> {icon.svgContent?.includes('<svg') ? 'YES' : 'NO'}</div>
-        <div><strong>Has &lt;/svg&gt;:</strong> {icon.svgContent?.includes('</svg>') ? 'YES' : 'NO'}</div>
-        <div><strong>Has paths:</strong> {icon.svgContent?.includes('<path') ? 'YES' : 'NO'}</div>
-        <div><strong>Has viewBox:</strong> {icon.svgContent?.includes('viewBox') ? 'YES' : 'NO'}</div>
-        <div><strong>Has fill:</strong> {icon.svgContent?.includes('fill=') ? 'YES' : 'NO'}</div>
-        <div><strong>Has stroke:</strong> {icon.svgContent?.includes('stroke=') ? 'YES' : 'NO'}</div>
-        <div><strong>ViewBox value:</strong> {icon.svgContent?.match(/viewBox="([^"]+)"/)?.[1] || 'Not found'}</div>
-      </div>
-      
-      {/* TEST RENDERS */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div>
-          <div className="text-xs font-bold mb-1">Direct Injection:</div>
-          <div 
-            className="w-20 h-20 border-2 border-red-500 bg-white flex items-center justify-center"
-            dangerouslySetInnerHTML={{ __html: icon.svgContent || 'NO CONTENT' }}
-          />
-        </div>
-        
-        <div>
-          <div className="text-xs font-bold mb-1">With Black Fill:</div>
-          <div 
-            className="w-20 h-20 border-2 border-blue-500 bg-white flex items-center justify-center"
-            dangerouslySetInnerHTML={{ 
-              __html: icon.svgContent?.replace(/fill="[^"]*"/g, 'fill="black"').replace(/stroke="[^"]*"/g, 'stroke="black"') || 'NO CONTENT' 
-            }}
-          />
-        </div>
-      </div>
-
-      {/* ADDITIONAL TEST RENDERS */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div>
-          <div className="text-xs font-bold mb-1">Force All Black:</div>
-          <div 
-            className="w-20 h-20 border-2 border-purple-500 bg-white flex items-center justify-center"
-            dangerouslySetInnerHTML={{ 
-              __html: icon.svgContent
-                ?.replace(/fill="[^"]*"/g, 'fill="black"')
-                ?.replace(/stroke="[^"]*"/g, 'stroke="black"')
-                ?.replace(/opacity="[^"]*"/g, 'opacity="1"')
-                ?.replace(/visibility="[^"]*"/g, 'visibility="visible"') || 'NO CONTENT' 
-            }}
-          />
-        </div>
-        
-        <div>
-          <div className="text-xs font-bold mb-1">Simplified:</div>
-          <div 
-            className="w-20 h-20 border-2 border-green-500 bg-white flex items-center justify-center"
-            style={{ color: 'black' }}
-          >
-            <div dangerouslySetInnerHTML={{ __html: icon.svgContent || 'NO CONTENT' }} />
-          </div>
-        </div>
-      </div>
-      
-      {/* ORIGINAL METADATA */}
-      <div className="text-xs bg-slate-100 p-2 rounded mb-4">
+      {/* Icon Metadata */}
+      <div className="text-xs text-slate-600 mb-4 space-y-1">
         <div><strong>Dimensions:</strong> {icon.dimensions.width}×{icon.dimensions.height}</div>
         <div><strong>File Size:</strong> {icon.fileSize} bytes</div>
-        <div><strong>Category:</strong> {icon.category || 'None'}</div>
+        {icon.category && <div><strong>Category:</strong> {icon.category}</div>}
       </div>
 
       {/* Actions */}

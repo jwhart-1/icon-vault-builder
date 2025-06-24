@@ -91,7 +91,7 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     return { svg, allGroups };
   };
 
-  const createProperIconSVG = (groupElement: Element, bbox: any, originalSVG: Element): string => {
+  const createProperIconSVG = (groupElement: Element, bbox: any, originalSVG: Element, fileName: string): string => {
     // Use provided bbox or calculate reasonable defaults
     let viewBoxX = bbox?.x || 0;
     let viewBoxY = bbox?.y || 0;
@@ -110,20 +110,29 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     // Clone the group and clean it up
     const clonedGroup = groupElement.cloneNode(true) as Element;
     
-    // Ensure visibility for all drawing elements
-    const allPaths = clonedGroup.querySelectorAll('path, circle, rect, polygon, line');
+    // Fix visibility for all drawing elements - USE BLACK INSTEAD OF currentColor
+    const allPaths = clonedGroup.querySelectorAll('path, circle, rect, polygon, line, ellipse');
     allPaths.forEach(path => {
-      // Make sure elements are visible
-      if (!path.hasAttribute('fill')) {
-        path.setAttribute('fill', 'currentColor');
+      const fill = path.getAttribute('fill');
+      const stroke = path.getAttribute('stroke');
+      
+      // Instead of currentColor, use black directly
+      if (!fill && !stroke) {
+        path.setAttribute('fill', '#000000');
+      } else if (fill === 'currentColor') {
+        path.setAttribute('fill', '#000000');
+      } else if (stroke === 'currentColor') {
+        path.setAttribute('stroke', '#000000');
       }
-      if (path.getAttribute('fill') === 'none' && !path.hasAttribute('stroke')) {
-        path.setAttribute('stroke', 'currentColor');
+      
+      // If fill is none, ensure there's a stroke
+      if (fill === 'none' && !stroke) {
+        path.setAttribute('stroke', '#000000');
         path.setAttribute('stroke-width', '1');
       }
     });
     
-    const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="100" height="100" fill="currentColor">
+    const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="100" height="100" fill="#000000">
 ${clonedGroup.outerHTML}
 </svg>`;
     
@@ -165,7 +174,7 @@ ${clonedGroup.outerHTML}
           }
           
           // Create the icon with proper viewBox
-          const iconSVG = createProperIconSVG(group, bbox, svg);
+          const iconSVG = createProperIconSVG(group, bbox, svg, fileName);
           
           extractedIcons.push({
             id: `${fileName}-icon-${Date.now()}-${index}`,
