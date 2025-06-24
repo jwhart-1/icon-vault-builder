@@ -31,25 +31,58 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
   }
 
   try {
-    // Extract all drawing elements (not just paths)
-    const pathMatches = svgContent.match(/<path[^>]*>/g) || [];
-    const circleMatches = svgContent.match(/<circle[^>]*>/g) || [];
-    const rectMatches = svgContent.match(/<rect[^>]*>/g) || [];
-    const lineMatches = svgContent.match(/<line[^>]*>/g) || [];
-    const ellipseMatches = svgContent.match(/<ellipse[^>]*>/g) || [];
-    const polygonMatches = svgContent.match(/<polygon[^>]*>/g) || [];
+    // Method 1: Try to extract content from groups first
+    let extractedContent = '';
     
-    const allElements = [
-      ...pathMatches,
-      ...circleMatches,
-      ...rectMatches,
-      ...lineMatches,
-      ...ellipseMatches,
-      ...polygonMatches
-    ];
+    // Look for group content (most comprehensive)
+    const groupMatches = svgContent.match(/<g[^>]*>(.*?)<\/g>/gs);
+    if (groupMatches && groupMatches.length > 0) {
+      // Take the largest group (likely contains the most content)
+      const largestGroup = groupMatches.reduce((largest, current) => 
+        current.length > largest.length ? current : largest
+      );
+      
+      // Extract content inside the group
+      const groupContentMatch = largestGroup.match(/<g[^>]*>(.*?)<\/g>/s);
+      if (groupContentMatch) {
+        extractedContent = groupContentMatch[1];
+      }
+    }
+    
+    // Method 2: If no groups, extract all drawing elements
+    if (!extractedContent) {
+      const pathMatches = svgContent.match(/<path[^>]*>/g) || [];
+      const circleMatches = svgContent.match(/<circle[^>]*>/g) || [];
+      const rectMatches = svgContent.match(/<rect[^>]*>/g) || [];
+      const lineMatches = svgContent.match(/<line[^>]*>/g) || [];
+      const ellipseMatches = svgContent.match(/<ellipse[^>]*>/g) || [];
+      const polygonMatches = svgContent.match(/<polygon[^>]*>/g) || [];
+      
+      extractedContent = [
+        ...pathMatches,
+        ...circleMatches,
+        ...rectMatches,
+        ...lineMatches,
+        ...ellipseMatches,
+        ...polygonMatches
+      ].join('');
+    }
+    
+    // Method 3: If still nothing, try to extract everything between svg tags
+    if (!extractedContent) {
+      const svgContentMatch = svgContent.match(/<svg[^>]*>(.*?)<\/svg>/s);
+      if (svgContentMatch) {
+        extractedContent = svgContentMatch[1]
+          // Remove defs, metadata, etc.
+          .replace(/<defs[^>]*>.*?<\/defs>/gs, '')
+          .replace(/<metadata[^>]*>.*?<\/metadata>/gs, '')
+          .replace(/<title[^>]*>.*?<\/title>/gs, '')
+          .replace(/<desc[^>]*>.*?<\/desc>/gs, '');
+      }
+    }
 
-    if (allElements.length === 0) {
-      // Fallback to colored square if no drawing elements found
+    if (!extractedContent.trim()) {
+      // Fallback to colored square
       return (
         <div 
           className="flex items-center justify-center text-white font-bold rounded-lg"
@@ -64,37 +97,43 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
       );
     }
 
-    // Process each element to ensure visibility
-    const cleanElements = allElements.map(element => {
-      let cleanElement = element;
-      
-      // Handle stroke-based icons (line icons)
-      if (!element.includes('fill=') && !element.includes('stroke=')) {
-        // Add black stroke for line icons
-        cleanElement = element.replace('>', ' fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">');
-      } else {
-        // Replace currentColor and none values
-        cleanElement = cleanElement
-          .replace(/fill="currentColor"/g, 'fill="#000000"')
-          .replace(/stroke="currentColor"/g, 'stroke="#000000"')
-          .replace(/fill="none"/g, 'fill="none"')
-          .replace(/stroke="none"/g, 'stroke="#000000"');
+    // Process the extracted content to ensure visibility
+    const processedContent = extractedContent
+      // Force stroke styling for line elements
+      .replace(/<(path|circle|rect|line|ellipse|polygon)([^>]*?)>/g, (match, tag, attrs) => {
+        let newAttrs = attrs;
         
-        // If it has fill="none", ensure it has a stroke
-        if (cleanElement.includes('fill="none"') && !cleanElement.includes('stroke=')) {
-          cleanElement = cleanElement.replace('>', ' stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">');
+        // If no fill or stroke specified, add stroke
+        if (!attrs.includes('fill=') && !attrs.includes('stroke=')) {
+          newAttrs += ' fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+        } else {
+          // Replace currentColor and problematic values
+          newAttrs = newAttrs
+            .replace(/fill="currentColor"/g, 'fill="#000000"')
+            .replace(/stroke="currentColor"/g, 'stroke="#000000"')
+            .replace(/fill="none"/g, 'fill="none"')
+            .replace(/stroke="none"/g, 'stroke="#000000"');
+          
+          // Ensure stroke width for stroke elements
+          if (newAttrs.includes('stroke=') && !newAttrs.includes('stroke-width=')) {
+            newAttrs += ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+          }
+          
+          // If fill="none", ensure stroke exists
+          if (newAttrs.includes('fill="none"') && !newAttrs.includes('stroke=')) {
+            newAttrs += ' stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+          }
         }
         
-        // If it has stroke but no width, add width
-        if (cleanElement.includes('stroke=') && !cleanElement.includes('stroke-width=')) {
-          cleanElement = cleanElement.replace('>', ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">');
-        }
-      }
-      
-      return cleanElement;
-    }).join('');
+        return `<${tag}${newAttrs}>`;
+      })
+      // Handle groups
+      .replace(/<g([^>]*?)>/g, '<g$1>')
+      // Remove problematic attributes
+      .replace(/opacity="[^"]*"/g, '')
+      .replace(/visibility="[^"]*"/g, '');
 
-    // Get the original viewBox from the source SVG
+    // Get original viewBox or use default
     const viewBoxMatch = svgContent.match(/viewBox="([^"]*)"/);
     const originalViewBox = viewBoxMatch ? viewBoxMatch[1] : '0 0 100 100';
 
@@ -108,7 +147,7 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
            stroke-width="2"
            stroke-linecap="round"
            stroke-linejoin="round">
-        ${cleanElements}
+        ${processedContent}
       </svg>
     `;
 
