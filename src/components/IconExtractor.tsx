@@ -36,27 +36,55 @@ export const IconExtractor: React.FC<IconExtractorProps> = ({
       return icons;
     }
 
-    // Function to create an icon from an SVG element
-    const createIcon = (element: Element, index: number, elementType: string): ExtractedIcon => {
+    const rootSvg = doc.querySelector('svg');
+    if (!rootSvg) {
+      console.error('No root SVG element found');
+      return icons;
+    }
+
+    console.log('Found root SVG element');
+
+    // Function to calculate bounding box of an element
+    const getBoundingBox = (element: Element) => {
+      // Try to get explicit x, y, width, height
+      const x = parseFloat(element.getAttribute('x') || '0');
+      const y = parseFloat(element.getAttribute('y') || '0');
+      const width = parseFloat(element.getAttribute('width') || '0');
+      const height = parseFloat(element.getAttribute('height') || '0');
+      
+      if (width > 0 && height > 0) {
+        return { x, y, width, height };
+      }
+
+      // For paths and other elements, try to extract from viewBox or calculate bounds
+      const viewBox = element.getAttribute('viewBox');
+      if (viewBox) {
+        const [vx, vy, vw, vh] = viewBox.split(' ').map(Number);
+        return { x: vx, y: vy, width: vw, height: vh };
+      }
+
+      // Default bounds if we can't determine
+      return { x: 0, y: 0, width: 24, height: 24 };
+    };
+
+    // Function to create an icon from an element
+    const createIcon = (element: Element, index: number, elementType: string, bounds?: any): ExtractedIcon => {
       const svgWrapper = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       
-      // Get dimensions from viewBox or width/height
-      const rootSvg = doc.querySelector('svg');
-      const viewBox = rootSvg?.getAttribute('viewBox') || element.getAttribute('viewBox');
+      // Get dimensions
+      const rootViewBox = rootSvg.getAttribute('viewBox');
       let width = 24, height = 24;
       
-      if (viewBox) {
-        const [, , w, h] = viewBox.split(' ').map(Number);
+      if (bounds) {
+        width = bounds.width;
+        height = bounds.height;
+        svgWrapper.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      } else if (rootViewBox) {
+        const [, , w, h] = rootViewBox.split(' ').map(Number);
         width = w || 24;
         height = h || 24;
-        svgWrapper.setAttribute('viewBox', viewBox);
+        svgWrapper.setAttribute('viewBox', `0 0 ${width} ${height}`);
       } else {
-        const w = rootSvg?.getAttribute('width') || element.getAttribute('width');
-        const h = rootSvg?.getAttribute('height') || element.getAttribute('height');
-        if (w && h) {
-          width = parseFloat(w) || 24;
-          height = parseFloat(h) || 24;
-        }
         svgWrapper.setAttribute('viewBox', `0 0 ${width} ${height}`);
       }
 
@@ -64,19 +92,34 @@ export const IconExtractor: React.FC<IconExtractorProps> = ({
       svgWrapper.setAttribute('height', height.toString());
       svgWrapper.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
       
-      // Copy any necessary attributes from the root SVG
-      if (rootSvg) {
-        const attributesToCopy = ['fill', 'stroke', 'stroke-width', 'style'];
-        attributesToCopy.forEach(attr => {
-          const value = rootSvg.getAttribute(attr);
-          if (value && !svgWrapper.getAttribute(attr)) {
-            svgWrapper.setAttribute(attr, value);
-          }
-        });
+      // Copy style attributes from root SVG
+      const stylesToCopy = ['fill', 'stroke', 'stroke-width', 'fill-rule', 'clip-rule', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit'];
+      stylesToCopy.forEach(attr => {
+        const value = rootSvg.getAttribute(attr) || element.getAttribute(attr);
+        if (value) {
+          svgWrapper.setAttribute(attr, value);
+        }
+      });
+
+      // Copy style attribute if present
+      const rootStyle = rootSvg.getAttribute('style');
+      const elementStyle = element.getAttribute('style');
+      if (rootStyle || elementStyle) {
+        svgWrapper.setAttribute('style', [rootStyle, elementStyle].filter(Boolean).join('; '));
       }
       
-      // Clone the element to avoid modifying the original
+      // Clone the element
       const clonedElement = element.cloneNode(true) as Element;
+      
+      // If the element has a transform, we might need to adjust it
+      if (bounds && (bounds.x !== 0 || bounds.y !== 0)) {
+        const existingTransform = clonedElement.getAttribute('transform') || '';
+        const translateTransform = `translate(${-bounds.x}, ${-bounds.y})`;
+        clonedElement.setAttribute('transform', 
+          existingTransform ? `${translateTransform} ${existingTransform}` : translateTransform
+        );
+      }
+      
       svgWrapper.appendChild(clonedElement);
 
       const serializer = new XMLSerializer();
@@ -98,109 +141,123 @@ export const IconExtractor: React.FC<IconExtractorProps> = ({
       };
     };
 
-    // Check if the SVG is already a single icon
-    const rootSvg = doc.querySelector('svg');
-    if (rootSvg) {
-      console.log('Found root SVG element');
-      
-      const symbols = rootSvg.querySelectorAll('symbol');
-      const groups = rootSvg.querySelectorAll('g');
-      const paths = rootSvg.querySelectorAll('path');
-      const circles = rootSvg.querySelectorAll('circle');
-      const rects = rootSvg.querySelectorAll('rect');
-      const polygons = rootSvg.querySelectorAll('polygon');
-      const polylines = rootSvg.querySelectorAll('polyline');
-      const ellipses = rootSvg.querySelectorAll('ellipse');
-      const lines = rootSvg.querySelectorAll('line');
+    // Look for different types of icon containers
+    const symbols = rootSvg.querySelectorAll('symbol');
+    const defs = rootSvg.querySelectorAll('defs > *');
+    const groups = rootSvg.querySelectorAll('g');
+    const uses = rootSvg.querySelectorAll('use');
+    
+    console.log('Found elements:', {
+      symbols: symbols.length,
+      defs: defs.length,
+      groups: groups.length,
+      uses: uses.length
+    });
 
-      console.log('Found elements:', {
-        symbols: symbols.length,
-        groups: groups.length,
-        paths: paths.length,
-        circles: circles.length,
-        rects: rects.length,
-        polygons: polygons.length,
-        polylines: polylines.length,
-        ellipses: ellipses.length,
-        lines: lines.length
+    let extractedCount = 0;
+
+    // Priority 1: Extract symbols (most common in icon libraries)
+    if (symbols.length > 0) {
+      console.log('Extracting from symbols');
+      symbols.forEach((symbol, index) => {
+        const bounds = getBoundingBox(symbol);
+        const icon = createIcon(symbol, index, 'symbol', bounds);
+        icons.push(icon);
+        extractedCount++;
       });
+    }
 
-      let extractedCount = 0;
+    // Priority 2: Extract from defs (definitions)
+    if (extractedCount === 0 && defs.length > 0) {
+      console.log('Extracting from defs');
+      defs.forEach((def, index) => {
+        // Skip if it's just a style or other non-visual element
+        if (['style', 'clipPath', 'mask', 'filter', 'linearGradient', 'radialGradient'].includes(def.tagName.toLowerCase())) {
+          return;
+        }
+        const bounds = getBoundingBox(def);
+        const icon = createIcon(def, index, 'def', bounds);
+        icons.push(icon);
+        extractedCount++;
+      });
+    }
 
-      // If it has symbols, extract each symbol as an icon
-      if (symbols.length > 0) {
-        symbols.forEach((symbol, index) => {
-          const icon = createIcon(symbol, index, 'symbol');
+    // Priority 3: Extract meaningful groups
+    if (extractedCount === 0 && groups.length > 1) {
+      console.log('Extracting from groups');
+      groups.forEach((group, index) => {
+        // Skip groups that are just containers or have IDs suggesting they're not individual icons
+        const groupId = group.getAttribute('id') || '';
+        const hasVisualContent = group.querySelector('path, circle, rect, polygon, polyline, ellipse, line, use');
+        
+        if (hasVisualContent && !groupId.includes('layer') && !groupId.includes('background')) {
+          const bounds = getBoundingBox(group);
+          const icon = createIcon(group, index, 'group', bounds);
           icons.push(icon);
           extractedCount++;
-        });
-      }
-      // If it has multiple groups, treat each as a potential icon
-      else if (groups.length > 1) {
-        groups.forEach((group, index) => {
-          // Skip groups that are just containers with no visible content
-          const hasContent = group.querySelector('path, circle, rect, polygon, polyline, ellipse, line');
-          if (hasContent) {
-            const icon = createIcon(group, index, 'group');
+        }
+      });
+    }
+
+    // Priority 4: Look for use elements (references to symbols/defs)
+    if (uses.length > 0) {
+      console.log('Processing use elements');
+      uses.forEach((use, index) => {
+        const href = use.getAttribute('href') || use.getAttribute('xlink:href');
+        if (href) {
+          // Find the referenced element
+          const referencedId = href.replace('#', '');
+          const referenced = doc.getElementById(referencedId);
+          if (referenced) {
+            const bounds = getBoundingBox(use);
+            const icon = createIcon(referenced, index, 'use', bounds);
             icons.push(icon);
             extractedCount++;
           }
-        });
-      }
-      // Extract individual shape elements
-      else {
-        // Extract paths
-        if (paths.length > 0) {
-          paths.forEach((path, index) => {
-            const icon = createIcon(path, index, 'path');
-            icons.push(icon);
-            extractedCount++;
-          });
         }
-        
-        // Extract other shapes
-        [...circles, ...rects, ...polygons, ...polylines, ...ellipses, ...lines].forEach((element, index) => {
-          const icon = createIcon(element, index, element.tagName.toLowerCase());
-          icons.push(icon);
-          extractedCount++;
-        });
+      });
+    }
+
+    // Priority 5: Extract individual shape elements if no other structure found
+    if (extractedCount === 0) {
+      console.log('Extracting individual shapes');
+      const shapes = rootSvg.querySelectorAll('path, circle, rect, polygon, polyline, ellipse, line');
+      
+      shapes.forEach((shape, index) => {
+        const bounds = getBoundingBox(shape);
+        const icon = createIcon(shape, index, shape.tagName.toLowerCase(), bounds);
+        icons.push(icon);
+        extractedCount++;
+      });
+    }
+
+    // Last resort: treat entire SVG as one icon
+    if (extractedCount === 0) {
+      console.log('No individual elements found, treating entire SVG as one icon');
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(rootSvg);
+      
+      const viewBox = rootSvg.getAttribute('viewBox');
+      let width = 24, height = 24;
+      
+      if (viewBox) {
+        const [, , w, h] = viewBox.split(' ').map(Number);
+        width = w || 24;
+        height = h || 24;
       }
 
-      // If no individual elements found, treat the entire SVG as one icon
-      if (extractedCount === 0) {
-        console.log('No individual elements found, treating entire SVG as one icon');
-        const serializer = new XMLSerializer();
-        const svgString = serializer.serializeToString(rootSvg);
-        
-        const viewBox = rootSvg.getAttribute('viewBox');
-        let width = 24, height = 24;
-        
-        if (viewBox) {
-          const [, , w, h] = viewBox.split(' ').map(Number);
-          width = w || 24;
-          height = h || 24;
-        } else {
-          const w = rootSvg.getAttribute('width');
-          const h = rootSvg.getAttribute('height');
-          if (w && h) {
-            width = parseFloat(w) || 24;
-            height = parseFloat(h) || 24;
-          }
-        }
-
-        icons.push({
-          id: `${fileName.replace('.svg', '')}-full-${Date.now()}`,
-          svgContent: svgString,
-          name: fileName.replace('.svg', ''),
-          category: '',
-          description: '',
-          keywords: [],
-          license: '',
-          author: '',
-          dimensions: { width, height },
-          fileSize: new Blob([svgString]).size,
-        });
-      }
+      icons.push({
+        id: `${fileName.replace('.svg', '')}-full-${Date.now()}`,
+        svgContent: svgString,
+        name: fileName.replace('.svg', ''),
+        category: '',
+        description: '',
+        keywords: [],
+        license: '',
+        author: '',
+        dimensions: { width, height },
+        fileSize: new Blob([svgString]).size,
+      });
     }
 
     console.log(`Extracted ${icons.length} icons from ${fileName}`);
@@ -244,7 +301,7 @@ export const IconExtractor: React.FC<IconExtractorProps> = ({
           Processing SVG Files
         </h3>
         <p className="text-slate-500 mb-4">
-          Extracting icons from your uploaded files...
+          Extracting individual icons from your sprite sheet...
         </p>
         <div className="w-full bg-slate-200 rounded-full h-2 mb-2">
           <div
