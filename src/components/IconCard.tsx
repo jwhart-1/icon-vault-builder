@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
 import { IconMetadataForm } from './IconMetadataForm';
@@ -52,9 +51,13 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
     svgElement.setAttribute('height', size.toString());
     svgElement.setAttribute('fill', 'black'); // Force black fill
     svgElement.setAttribute('stroke', 'black'); // Force black stroke
-    svgElement.style.display = 'block';
-    svgElement.style.width = `${size}px`;
-    svgElement.style.height = `${size}px`;
+    
+    // Cast to HTMLElement to access style property
+    if (svgElement instanceof HTMLElement) {
+      svgElement.style.display = 'block';
+      svgElement.style.width = `${size}px`;
+      svgElement.style.height = `${size}px`;
+    }
 
     // Find all drawing elements and force visibility
     const drawingElements = svgElement.querySelectorAll('path, circle, rect, polygon, line, ellipse, g');
@@ -65,15 +68,21 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
       element.setAttribute('fill', 'currentColor');
       element.setAttribute('stroke', 'currentColor');
       element.setAttribute('stroke-width', '1');
-      element.style.opacity = '1';
-      element.style.visibility = 'visible';
+      
+      // Cast to HTMLElement to access style property
+      if (element instanceof HTMLElement) {
+        element.style.opacity = '1';
+        element.style.visibility = 'visible';
+      }
     });
 
     // Also check for nested groups
     const groups = svgElement.querySelectorAll('g');
     groups.forEach(group => {
-      group.style.opacity = '1';
-      group.style.visibility = 'visible';
+      if (group instanceof HTMLElement) {
+        group.style.opacity = '1';
+        group.style.visibility = 'visible';
+      }
       group.removeAttribute('opacity');
     });
 
