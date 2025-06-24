@@ -1,8 +1,30 @@
 
 import { useState } from 'react';
-import { supabase, IconRecord } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { ExtractedIcon } from '@/components/SvgIconManager';
 import { useToast } from '@/hooks/use-toast';
+
+export interface IconRecord {
+  id: string;
+  name: string;
+  svg_content: string;
+  category?: string;
+  description?: string;
+  keywords?: string[];
+  license?: string;
+  author?: string;
+  file_size?: number;
+  dimensions?: { width: number; height: number };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CategoryRecord {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+}
 
 export const useIconStorage = () => {
   const [isLoading, setIsLoading] = useState(false);
