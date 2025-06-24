@@ -27,8 +27,8 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
       if ((element as any).getBBox) {
         const bbox = (element as any).getBBox();
         return {
-          width: Math.round(bbox.width),
-          height: Math.round(bbox.height),
+          width: Math.max(24, Math.round(bbox.width)),
+          height: Math.max(24, Math.round(bbox.height)),
           x: Math.round(bbox.x),
           y: Math.round(bbox.y)
         };
@@ -41,28 +41,32 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
   };
 
   const createIndividualIconSVG = (element: Element, originalSVG: Element): string => {
-    // Use a standard 24x24 viewBox for consistency
-    const viewBox = '0 0 24 24';
+    // Get dimensions from the element
+    const dims = getElementDimensions(element);
+    const width = Math.max(24, dims.width);
+    const height = Math.max(24, dims.height);
+    
+    // Use a proper viewBox
+    const viewBox = `0 0 ${width} ${height}`;
     
     // Get any relevant attributes from the original SVG
     const xmlns = originalSVG.getAttribute('xmlns') || 'http://www.w3.org/2000/svg';
     
-    // Get styles from original SVG if any
-    const styleElement = originalSVG.querySelector('style');
-    const styleContent = styleElement ? `<style>${styleElement.innerHTML}</style>` : '';
+    // Clone the element to avoid modifying the original
+    const clonedElement = element.cloneNode(true) as Element;
     
-    // Get defs from original SVG if any
-    const defsElement = originalSVG.querySelector('defs');
-    const defsContent = defsElement ? defsElement.outerHTML : '';
+    // Ensure the element has proper styling
+    if (clonedElement.tagName === 'g') {
+      clonedElement.setAttribute('fill', 'currentColor');
+      clonedElement.setAttribute('stroke', 'currentColor');
+    }
     
-    // Create a standalone SVG for this icon with proper styling
-    const iconSVG = `<svg xmlns="${xmlns}" viewBox="${viewBox}" width="48" height="48" fill="currentColor" stroke="currentColor" stroke-width="1">
-  ${defsContent}
-  ${styleContent}
-  ${element.outerHTML}
+    // Create a standalone SVG for this icon
+    const iconSVG = `<svg xmlns="${xmlns}" viewBox="${viewBox}" width="24" height="24" fill="currentColor">
+${clonedElement.outerHTML}
 </svg>`;
     
-    console.log(`Created icon SVG (${iconSVG.length} chars):`, iconSVG.substring(0, 200));
+    console.log(`Created icon SVG (${iconSVG.length} chars) with dims ${width}x${height}:`, iconSVG.substring(0, 200));
     return iconSVG;
   };
 
@@ -133,7 +137,7 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
           keywords: ['grid', 'detected'],
           license: '',
           author: '',
-          dimensions: { width: item.width, height: item.height },
+          dimensions: { width: Math.max(24, item.width), height: Math.max(24, item.height) },
           fileSize: new Blob([iconSVG]).size,
         });
       });
@@ -184,9 +188,10 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
       if (totalElements > 0) {
         const iconSVG = createIndividualIconSVG(symbol, svgElement);
         const symbolId = symbol.getAttribute('id') || `symbol-${index}`;
+        const dims = getElementDimensions(symbol);
         
         console.log(`Symbol ${index} SVG:`, iconSVG.substring(0, 200));
-        console.log(`Symbol ${index} original:`, symbol.outerHTML.substring(0, 200));
+        console.log(`Symbol ${index} dimensions:`, dims);
         
         extractedIcons.push({
           id: `${fileName}-symbol-${symbolId}-${Date.now()}-${index}`,
@@ -197,7 +202,7 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
           keywords: [symbolId, 'symbol'],
           license: '',
           author: '',
-          dimensions: { width: 24, height: 24 },
+          dimensions: dims,
           fileSize: new Blob([iconSVG]).size,
         });
         
@@ -227,9 +232,10 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
         if (totalElements > 0 && totalElements < 50) { // Reasonable complexity for a single icon
           const iconSVG = createIndividualIconSVG(group, svgElement);
           const groupId = group.getAttribute('id') || group.getAttribute('class') || `group-${index}`;
+          const dims = getElementDimensions(group);
           
           console.log(`Group ${index} SVG:`, iconSVG.substring(0, 200));
-          console.log(`Group ${index} original:`, group.outerHTML.substring(0, 200));
+          console.log(`Group ${index} dimensions:`, dims);
           
           extractedIcons.push({
             id: `${fileName}-group-${groupId}-${Date.now()}-${index}`,
@@ -242,11 +248,11 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
             keywords: [groupId, 'group'],
             license: '',
             author: '',
-            dimensions: getElementDimensions(group),
+            dimensions: dims,
             fileSize: new Blob([iconSVG]).size,
           });
           
-          console.log(`✓ Extracted icon ${index + 1} with ${totalElements} elements`);
+          console.log(`✓ Extracted icon ${index + 1} with ${totalElements} elements, dims: ${dims.width}x${dims.height}`);
         }
       });
     }
@@ -263,8 +269,10 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
       
       [...directPaths, ...directShapes].slice(0, 30).forEach((element, index) => {
         const iconSVG = createIndividualIconSVG(element, svgElement);
+        const dims = getElementDimensions(element);
         
         console.log(`Direct element ${index} SVG:`, iconSVG.substring(0, 200));
+        console.log(`Direct element ${index} dimensions:`, dims);
         
         extractedIcons.push({
           id: `${fileName}-direct-${Date.now()}-${index}`,
@@ -275,7 +283,7 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
           keywords: ['direct', 'element'],
           license: '',
           author: '',
-          dimensions: getElementDimensions(element),
+          dimensions: dims,
           fileSize: new Blob([iconSVG]).size,
         });
       });
@@ -297,6 +305,7 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
         name: icon.name,
         hasContent: !!icon.svgContent,
         contentLength: icon.svgContent?.length,
+        dimensions: icon.dimensions,
         contentPreview: icon.svgContent?.substring(0, 100)
       });
     });
