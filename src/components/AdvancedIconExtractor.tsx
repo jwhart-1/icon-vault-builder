@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
 import { Loader2 } from 'lucide-react';
@@ -22,36 +21,64 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
     }
   }, [files]);
 
+  const isValidIcon = (element: Element): boolean => {
+    // Check if element has actual visual content
+    const hasPath = element.querySelector('path');
+    const hasCircle = element.querySelector('circle');
+    const hasRect = element.querySelector('rect');
+    const hasPolygon = element.querySelector('polygon');
+    const hasEllipse = element.querySelector('ellipse');
+    const hasLine = element.querySelector('line');
+    
+    if (!hasPath && !hasCircle && !hasRect && !hasPolygon && !hasEllipse && !hasLine) {
+      return false;
+    }
+
+    // Check if path has meaningful data
+    if (hasPath) {
+      const pathData = hasPath.getAttribute('d');
+      if (!pathData || pathData.length < 10) { // Very short path data is likely not an icon
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const detectGridPattern = (elements: Element[], svgContainer: SVGElement): ExtractedIcon[] => {
     console.log('Detecting grid pattern...');
+    const validElements = elements.filter(el => isValidIcon(el));
+    console.log(`Found ${validElements.length} valid elements out of ${elements.length} total`);
+    
+    if (validElements.length === 0) {
+      return [];
+    }
+
     const positions: Array<{element: Element, x: number, y: number, width: number, height: number}> = [];
     
-    elements.forEach(el => {
+    validElements.forEach(el => {
       try {
         const bbox = (el as any).getBBox ? (el as any).getBBox() : { x: 0, y: 0, width: 20, height: 20 };
-        positions.push({
-          element: el,
-          x: bbox.x || 0,
-          y: bbox.y || 0,
-          width: bbox.width || 20,
-          height: bbox.height || 20
-        });
+        // Only include elements with reasonable dimensions
+        if (bbox.width > 5 && bbox.height > 5) {
+          positions.push({
+            element: el,
+            x: bbox.x || 0,
+            y: bbox.y || 0,
+            width: bbox.width || 20,
+            height: bbox.height || 20
+          });
+        }
       } catch (error) {
-        // Fallback for elements that don't support getBBox
-        positions.push({
-          element: el,
-          x: 0,
-          y: 0,
-          width: 20,
-          height: 20
-        });
+        // Skip elements that can't provide bbox
+        console.log('Skipping element without valid bbox');
       }
     });
 
-    // Group by approximate Y positions (rows)
+    // Group by approximate Y positions (rows) with larger tolerance
     const rows: { [key: number]: typeof positions } = {};
     positions.forEach(pos => {
-      const rowKey = Math.round(pos.y / 50) * 50; // Group by 50px rows
+      const rowKey = Math.round(pos.y / 100) * 100; // Group by 100px rows
       if (!rows[rowKey]) rows[rowKey] = [];
       rows[rowKey].push(pos);
     });
@@ -59,10 +86,10 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
     const gridIcons: ExtractedIcon[] = [];
     Object.values(rows).forEach((row, rowIndex) => {
       row.sort((a, b) => a.x - b.x); // Sort by X position
-      row.forEach((item, colIndex) => {
+      row.slice(0, 10).forEach((item, colIndex) => { // Limit to 10 per row
         if (item.element && item.element.outerHTML) {
           const svgWrapper = createIndividualSVG(item.element.outerHTML, svgContainer);
-          if (svgWrapper) {
+          if (svgWrapper && svgWrapper.length > 100) { // Ensure meaningful SVG content
             gridIcons.push({
               id: `grid-${Date.now()}-${rowIndex}-${colIndex}`,
               svgContent: svgWrapper,
@@ -72,7 +99,7 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
               keywords: [],
               license: '',
               author: '',
-              dimensions: { width: item.width, height: item.height },
+              dimensions: { width: Math.round(item.width), height: Math.round(item.height) },
               fileSize: new Blob([svgWrapper]).size,
             });
           }
@@ -80,7 +107,7 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
       });
     });
 
-    return gridIcons.slice(0, 50); // Limit grid icons
+    return gridIcons.slice(0, 20); // Limit total grid icons to 20
   };
 
   const createIndividualSVG = (iconContent: string, originalSvg: SVGElement): string => {
@@ -89,9 +116,16 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
       const width = originalSvg.getAttribute('width') || '100';
       const height = originalSvg.getAttribute('height') || '100';
       
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">
+      // Extract styles from original SVG
+      const styles = originalSvg.querySelector('style');
+      const styleContent = styles ? styles.innerHTML : '';
+      
+      const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">
+        ${styleContent ? `<style>${styleContent}</style>` : ''}
         ${iconContent}
       </svg>`;
+      
+      return svgContent;
     } catch (error) {
       console.error('Error creating individual SVG:', error);
       return '';
@@ -125,78 +159,19 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
 
     // Strategy 1: Look for <symbol> elements
     setCurrentStrategy('Extracting symbols...');
-    const symbols = Array.from(svgElement.querySelectorAll('symbol')).slice(0, 50);
+    const symbols = Array.from(svgElement.querySelectorAll('symbol')).slice(0, 30);
     console.log(`Found ${symbols.length} symbols`);
     
     if (symbols.length > 0) {
       symbols.forEach((symbol, index) => {
-        try {
-          const svgWrapper = createIndividualSVG(symbol.outerHTML, svgElement);
-          if (svgWrapper) {
-            icons.push({
-              id: `${fileName}-symbol-${index}-${Date.now()}`,
-              svgContent: svgWrapper,
-              name: symbol.getAttribute('id') || `${fileName}-symbol-${index + 1}`,
-              category: '',
-              description: '',
-              keywords: [],
-              license: '',
-              author: '',
-              dimensions: { width: 24, height: 24 },
-              fileSize: new Blob([svgWrapper]).size,
-            });
-          }
-        } catch (error) {
-          console.error(`Error processing symbol ${index}:`, error);
-        }
-      });
-    }
-
-    // Strategy 2: Look for <defs> with groups
-    if (icons.length === 0) {
-      setCurrentStrategy('Extracting definitions...');
-      const defsGroups = Array.from(svgElement.querySelectorAll('defs > g')).slice(0, 50);
-      console.log(`Found ${defsGroups.length} definition groups`);
-      
-      defsGroups.forEach((group, index) => {
-        try {
-          const svgWrapper = createIndividualSVG(group.outerHTML, svgElement);
-          if (svgWrapper) {
-            icons.push({
-              id: `${fileName}-def-${index}-${Date.now()}`,
-              svgContent: svgWrapper,
-              name: group.getAttribute('id') || `${fileName}-def-${index + 1}`,
-              category: '',
-              description: '',
-              keywords: [],
-              license: '',
-              author: '',
-              dimensions: { width: 24, height: 24 },
-              fileSize: new Blob([svgWrapper]).size,
-            });
-          }
-        } catch (error) {
-          console.error(`Error processing def group ${index}:`, error);
-        }
-      });
-    }
-
-    // Strategy 3: Look for direct child groups
-    if (icons.length === 0) {
-      setCurrentStrategy('Extracting groups...');
-      const groups = Array.from(svgElement.querySelectorAll('svg > g')).slice(0, 50);
-      console.log(`Found ${groups.length} direct groups`);
-      
-      groups.forEach((group, index) => {
-        const childElements = group.children.length;
-        if (childElements > 0 && childElements < 50) {
+        if (isValidIcon(symbol)) {
           try {
-            const svgWrapper = createIndividualSVG(group.outerHTML, svgElement);
-            if (svgWrapper) {
+            const svgWrapper = createIndividualSVG(symbol.outerHTML, svgElement);
+            if (svgWrapper && svgWrapper.length > 100) {
               icons.push({
-                id: `${fileName}-group-${index}-${Date.now()}`,
+                id: `${fileName}-symbol-${index}-${Date.now()}`,
                 svgContent: svgWrapper,
-                name: group.getAttribute('id') || `${fileName}-group-${index + 1}`,
+                name: symbol.getAttribute('id') || `${fileName}-symbol-${index + 1}`,
                 category: '',
                 description: '',
                 keywords: [],
@@ -207,7 +182,69 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
               });
             }
           } catch (error) {
-            console.error(`Error processing group ${index}:`, error);
+            console.error(`Error processing symbol ${index}:`, error);
+          }
+        }
+      });
+    }
+
+    // Strategy 2: Look for <defs> with groups
+    if (icons.length === 0) {
+      setCurrentStrategy('Extracting definitions...');
+      const defsGroups = Array.from(svgElement.querySelectorAll('defs > g')).slice(0, 30);
+      console.log(`Found ${defsGroups.length} definition groups`);
+      
+      defsGroups.forEach((group, index) => {
+        if (isValidIcon(group)) {
+          try {
+            const svgWrapper = createIndividualSVG(group.outerHTML, svgElement);
+            if (svgWrapper && svgWrapper.length > 100) {
+              icons.push({
+                id: `${fileName}-def-${index}-${Date.now()}`,
+                svgContent: svgWrapper,
+                name: group.getAttribute('id') || `${fileName}-def-${index + 1}`,
+                category: '',
+                description: '',
+                keywords: [],
+                license: '',
+                author: '',
+                dimensions: { width: 24, height: 24 },
+                fileSize: new Blob([svgWrapper]).size,
+              });
+            }
+          } catch (error) {
+            console.error(`Error processing def group ${index}:`, error);
+          }
+        }
+      });
+    }
+
+    // Strategy 3: Look for direct child groups with IDs or classes
+    if (icons.length === 0) {
+      setCurrentStrategy('Extracting named groups...');
+      const namedGroups = Array.from(svgElement.querySelectorAll('svg > g[id], svg > g[class]')).slice(0, 30);
+      console.log(`Found ${namedGroups.length} named groups`);
+      
+      namedGroups.forEach((group, index) => {
+        if (isValidIcon(group)) {
+          try {
+            const svgWrapper = createIndividualSVG(group.outerHTML, svgElement);
+            if (svgWrapper && svgWrapper.length > 100) {
+              icons.push({
+                id: `${fileName}-named-${index}-${Date.now()}`,
+                svgContent: svgWrapper,
+                name: group.getAttribute('id') || group.getAttribute('class') || `${fileName}-named-${index + 1}`,
+                category: '',
+                description: '',
+                keywords: [],
+                license: '',
+                author: '',
+                dimensions: { width: 24, height: 24 },
+                fileSize: new Blob([svgWrapper]).size,
+              });
+            }
+          } catch (error) {
+            console.error(`Error processing named group ${index}:`, error);
           }
         }
       });
@@ -216,7 +253,7 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
     // Strategy 4: Look for <use> elements referencing symbols
     if (icons.length === 0) {
       setCurrentStrategy('Extracting use elements...');
-      const useElements = Array.from(svgElement.querySelectorAll('use')).slice(0, 50);
+      const useElements = Array.from(svgElement.querySelectorAll('use')).slice(0, 30);
       console.log(`Found ${useElements.length} use elements`);
       
       useElements.forEach((useEl, index) => {
@@ -224,7 +261,7 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
           const href = useEl.getAttribute('href') || useEl.getAttribute('xlink:href');
           if (href) {
             const svgWrapper = createIndividualSVG(useEl.outerHTML, svgElement);
-            if (svgWrapper) {
+            if (svgWrapper && svgWrapper.length > 100) {
               icons.push({
                 id: `${fileName}-use-${index}-${Date.now()}`,
                 svgContent: svgWrapper,
@@ -245,51 +282,24 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
       });
     }
 
-    // Strategy 5: Grid-based extraction
-    if (icons.length < 5) {
-      setCurrentStrategy('Detecting grid patterns...');
-      const allElements = Array.from(svgElement.querySelectorAll('g, path, circle, rect, polygon, ellipse')).slice(0, 100);
+    // Strategy 5: Smart grid-based extraction (only if we found very few icons)
+    if (icons.length < 3) {
+      setCurrentStrategy('Detecting meaningful patterns...');
+      const allElements = Array.from(svgElement.querySelectorAll('g, path[d]')).slice(0, 50);
+      console.log(`Analyzing ${allElements.length} potential icon elements`);
       const gridIcons = detectGridPattern(allElements, svgElement);
+      console.log(`Grid detection found ${gridIcons.length} valid icons`);
       icons.push(...gridIcons);
     }
 
-    // Strategy 6: Extract individual shapes if nothing else worked
+    // Last resort: entire SVG as one icon (only if no other icons found)
     if (icons.length === 0) {
-      setCurrentStrategy('Extracting individual paths...');
-      const paths = Array.from(svgElement.querySelectorAll('path, circle, rect, polygon, ellipse')).slice(0, 50);
-      console.log(`Found ${paths.length} individual shapes`);
-      
-      paths.forEach((path, index) => {
-        try {
-          const svgWrapper = createIndividualSVG(path.outerHTML, svgElement);
-          if (svgWrapper) {
-            icons.push({
-              id: `${fileName}-path-${index}-${Date.now()}`,
-              svgContent: svgWrapper,
-              name: `${fileName}-path-${index + 1}`,
-              category: '',
-              description: '',
-              keywords: [],
-              license: '',
-              author: '',
-              dimensions: { width: 24, height: 24 },
-              fileSize: new Blob([svgWrapper]).size,
-            });
-          }
-        } catch (error) {
-          console.error(`Error processing path ${index}:`, error);
-        }
-      });
-    }
-
-    // Last resort: entire SVG as one icon
-    if (icons.length === 0) {
-      setCurrentStrategy('Using entire SVG...');
+      setCurrentStrategy('Using entire SVG as single icon...');
       try {
         const serializer = new XMLSerializer();
         const svgString = serializer.serializeToString(svgElement);
         
-        if (svgString.length < 50000) {
+        if (svgString.length < 100000 && svgString.length > 200) { // Reasonable size limits
           icons.push({
             id: `${fileName}-full-${Date.now()}`,
             svgContent: svgString,
@@ -308,8 +318,8 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
       }
     }
 
-    console.log(`Extracted ${icons.length} icons from ${fileName}`);
-    return icons.slice(0, 100); // Limit total icons
+    console.log(`Successfully extracted ${icons.length} valid icons from ${fileName}`);
+    return icons.slice(0, 25); // Reasonable limit on total icons
   };
 
   const processFiles = async () => {
