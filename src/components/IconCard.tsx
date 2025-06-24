@@ -40,14 +40,17 @@ export const IconCard: React.FC<IconCardProps> = ({
       {/* Icon Preview */}
       <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-4 border">
         <div
-          className="max-w-full max-h-full"
+          className="max-w-full max-h-full flex items-center justify-center"
+          style={{ width: '80px', height: '80px' }}
           dangerouslySetInnerHTML={{ __html: icon.svgContent }}
         />
       </div>
 
       {/* Icon Info */}
       <div className="space-y-2">
-        <h3 className="font-semibold text-slate-800 truncate">{icon.name}</h3>
+        <h3 className="font-semibold text-slate-800 truncate" title={icon.name}>
+          {icon.name}
+        </h3>
         <div className="flex justify-between text-sm text-slate-600">
           <span>{icon.dimensions.width}×{icon.dimensions.height}</span>
           <span>{(icon.fileSize / 1024).toFixed(1)}KB</span>
@@ -60,7 +63,7 @@ export const IconCard: React.FC<IconCardProps> = ({
         )}
 
         {icon.keywords.length > 0 && (
-          <p className="text-xs text-slate-500 truncate">
+          <p className="text-xs text-slate-500 truncate" title={icon.keywords.join(', ')}>
             Tags: {icon.keywords.join(', ')}
           </p>
         )}
@@ -111,7 +114,7 @@ export const IconCard: React.FC<IconCardProps> = ({
               <h3 className="text-lg font-semibold">{icon.name}</h3>
               <button
                 onClick={() => setShowPreview(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-600 text-2xl"
               >
                 ×
               </button>
@@ -119,7 +122,7 @@ export const IconCard: React.FC<IconCardProps> = ({
             
             <div className="bg-slate-50 rounded-lg p-8 mb-4 flex items-center justify-center">
               <div
-                className="w-32 h-32"
+                className="w-32 h-32 flex items-center justify-center"
                 dangerouslySetInnerHTML={{ __html: icon.svgContent }}
               />
             </div>
