@@ -25,6 +25,12 @@ export const IconExtractor: React.FC<IconExtractorProps> = ({
     console.log('Processing SVG file:', fileName);
     console.log('SVG content length:', svgContent.length);
     
+    // Limit SVG content size to prevent memory issues
+    if (svgContent.length > 5000000) { // 5MB limit
+      console.error('SVG file too large:', fileName);
+      return [];
+    }
+    
     const parser = new DOMParser();
     const doc = parser.parseFromString(svgContent, 'image/svg+xml');
     const icons: ExtractedIcon[] = [];
@@ -44,224 +50,145 @@ export const IconExtractor: React.FC<IconExtractorProps> = ({
 
     console.log('Found root SVG element');
 
-    // Function to calculate bounding box of an element
-    const getBoundingBox = (element: Element) => {
-      // Try to get explicit x, y, width, height
-      const x = parseFloat(element.getAttribute('x') || '0');
-      const y = parseFloat(element.getAttribute('y') || '0');
-      const width = parseFloat(element.getAttribute('width') || '0');
-      const height = parseFloat(element.getAttribute('height') || '0');
-      
-      if (width > 0 && height > 0) {
-        return { x, y, width, height };
-      }
-
-      // For paths and other elements, try to extract from viewBox or calculate bounds
-      const viewBox = element.getAttribute('viewBox');
-      if (viewBox) {
-        const [vx, vy, vw, vh] = viewBox.split(' ').map(Number);
-        return { x: vx, y: vy, width: vw, height: vh };
-      }
-
-      // Default bounds if we can't determine
-      return { x: 0, y: 0, width: 24, height: 24 };
-    };
-
     // Function to create an icon from an element
-    const createIcon = (element: Element, index: number, elementType: string, bounds?: any): ExtractedIcon => {
-      const svgWrapper = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      
-      // Get dimensions
-      const rootViewBox = rootSvg.getAttribute('viewBox');
-      let width = 24, height = 24;
-      
-      if (bounds) {
-        width = bounds.width;
-        height = bounds.height;
-        svgWrapper.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      } else if (rootViewBox) {
-        const [, , w, h] = rootViewBox.split(' ').map(Number);
-        width = w || 24;
-        height = h || 24;
-        svgWrapper.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      } else {
-        svgWrapper.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      }
-
-      svgWrapper.setAttribute('width', width.toString());
-      svgWrapper.setAttribute('height', height.toString());
-      svgWrapper.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-      
-      // Copy style attributes from root SVG
-      const stylesToCopy = ['fill', 'stroke', 'stroke-width', 'fill-rule', 'clip-rule', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit'];
-      stylesToCopy.forEach(attr => {
-        const value = rootSvg.getAttribute(attr) || element.getAttribute(attr);
-        if (value) {
-          svgWrapper.setAttribute(attr, value);
+    const createIcon = (element: Element, index: number, elementType: string): ExtractedIcon => {
+      try {
+        const svgWrapper = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        
+        // Get dimensions from viewBox or default
+        const rootViewBox = rootSvg.getAttribute('viewBox');
+        let width = 24, height = 24;
+        
+        if (rootViewBox) {
+          const [, , w, h] = rootViewBox.split(' ').map(Number);
+          width = w || 24;
+          height = h || 24;
         }
-      });
 
-      // Copy style attribute if present
-      const rootStyle = rootSvg.getAttribute('style');
-      const elementStyle = element.getAttribute('style');
-      if (rootStyle || elementStyle) {
-        svgWrapper.setAttribute('style', [rootStyle, elementStyle].filter(Boolean).join('; '));
+        svgWrapper.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        svgWrapper.setAttribute('width', width.toString());
+        svgWrapper.setAttribute('height', height.toString());
+        svgWrapper.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        
+        // Copy essential attributes from root SVG
+        const stylesToCopy = ['fill', 'stroke', 'stroke-width'];
+        stylesToCopy.forEach(attr => {
+          const value = rootSvg.getAttribute(attr);
+          if (value) {
+            svgWrapper.setAttribute(attr, value);
+          }
+        });
+        
+        // Clone the element with limited depth to prevent infinite loops
+        const clonedElement = element.cloneNode(true) as Element;
+        svgWrapper.appendChild(clonedElement);
+
+        const serializer = new XMLSerializer();
+        const svgString = serializer.serializeToString(svgWrapper);
+
+        // Limit individual SVG size
+        if (svgString.length > 50000) { // 50KB limit per icon
+          console.warn(`Icon ${index} too large, skipping`);
+          return null;
+        }
+
+        console.log(`Created icon ${index + 1} from ${elementType}`);
+
+        return {
+          id: `${fileName.replace('.svg', '')}-${elementType}-${index}-${Date.now()}`,
+          svgContent: svgString,
+          name: `${fileName.replace('.svg', '')}-${elementType}-${index + 1}`,
+          category: '',
+          description: '',
+          keywords: [],
+          license: '',
+          author: '',
+          dimensions: { width, height },
+          fileSize: new Blob([svgString]).size,
+        };
+      } catch (error) {
+        console.error(`Error creating icon ${index}:`, error);
+        return null;
       }
-      
-      // Clone the element
-      const clonedElement = element.cloneNode(true) as Element;
-      
-      // If the element has a transform, we might need to adjust it
-      if (bounds && (bounds.x !== 0 || bounds.y !== 0)) {
-        const existingTransform = clonedElement.getAttribute('transform') || '';
-        const translateTransform = `translate(${-bounds.x}, ${-bounds.y})`;
-        clonedElement.setAttribute('transform', 
-          existingTransform ? `${translateTransform} ${existingTransform}` : translateTransform
-        );
-      }
-      
-      svgWrapper.appendChild(clonedElement);
-
-      const serializer = new XMLSerializer();
-      const svgString = serializer.serializeToString(svgWrapper);
-
-      console.log(`Created icon ${index + 1} from ${elementType}:`, svgString.substring(0, 200) + '...');
-
-      return {
-        id: `${fileName.replace('.svg', '')}-${elementType}-${index}-${Date.now()}`,
-        svgContent: svgString,
-        name: `${fileName.replace('.svg', '')}-${elementType}-${index + 1}`,
-        category: '',
-        description: '',
-        keywords: [],
-        license: '',
-        author: '',
-        dimensions: { width, height },
-        fileSize: new Blob([svgString]).size,
-      };
     };
 
-    // Look for different types of icon containers
-    const symbols = rootSvg.querySelectorAll('symbol');
-    const defs = rootSvg.querySelectorAll('defs > *');
-    const groups = rootSvg.querySelectorAll('g');
-    const uses = rootSvg.querySelectorAll('use');
+    // Look for different types of icon containers with limits
+    const MAX_ICONS_PER_TYPE = 50; // Prevent processing too many elements
     
-    console.log('Found elements:', {
-      symbols: symbols.length,
-      defs: defs.length,
-      groups: groups.length,
-      uses: uses.length
-    });
-
-    let extractedCount = 0;
-
-    // Priority 1: Extract symbols (most common in icon libraries)
+    // Priority 1: Extract symbols
+    const symbols = Array.from(rootSvg.querySelectorAll('symbol')).slice(0, MAX_ICONS_PER_TYPE);
+    console.log('Found symbols:', symbols.length);
+    
     if (symbols.length > 0) {
-      console.log('Extracting from symbols');
       symbols.forEach((symbol, index) => {
-        const bounds = getBoundingBox(symbol);
-        const icon = createIcon(symbol, index, 'symbol', bounds);
-        icons.push(icon);
-        extractedCount++;
+        const icon = createIcon(symbol, index, 'symbol');
+        if (icon) icons.push(icon);
       });
     }
 
-    // Priority 2: Extract from defs (definitions)
-    if (extractedCount === 0 && defs.length > 0) {
-      console.log('Extracting from defs');
-      defs.forEach((def, index) => {
-        // Skip if it's just a style or other non-visual element
-        if (['style', 'clipPath', 'mask', 'filter', 'linearGradient', 'radialGradient'].includes(def.tagName.toLowerCase())) {
-          return;
-        }
-        const bounds = getBoundingBox(def);
-        const icon = createIcon(def, index, 'def', bounds);
-        icons.push(icon);
-        extractedCount++;
-      });
-    }
-
-    // Priority 3: Extract meaningful groups
-    if (extractedCount === 0 && groups.length > 1) {
-      console.log('Extracting from groups');
-      groups.forEach((group, index) => {
-        // Skip groups that are just containers or have IDs suggesting they're not individual icons
-        const groupId = group.getAttribute('id') || '';
-        const hasVisualContent = group.querySelector('path, circle, rect, polygon, polyline, ellipse, line, use');
-        
-        if (hasVisualContent && !groupId.includes('layer') && !groupId.includes('background')) {
-          const bounds = getBoundingBox(group);
-          const icon = createIcon(group, index, 'group', bounds);
-          icons.push(icon);
-          extractedCount++;
-        }
-      });
-    }
-
-    // Priority 4: Look for use elements (references to symbols/defs)
-    if (uses.length > 0) {
-      console.log('Processing use elements');
-      uses.forEach((use, index) => {
-        const href = use.getAttribute('href') || use.getAttribute('xlink:href');
-        if (href) {
-          // Find the referenced element
-          const referencedId = href.replace('#', '');
-          const referenced = doc.getElementById(referencedId);
-          if (referenced) {
-            const bounds = getBoundingBox(use);
-            const icon = createIcon(referenced, index, 'use', bounds);
-            icons.push(icon);
-            extractedCount++;
-          }
-        }
-      });
-    }
-
-    // Priority 5: Extract individual shape elements if no other structure found
-    if (extractedCount === 0) {
-      console.log('Extracting individual shapes');
-      const shapes = rootSvg.querySelectorAll('path, circle, rect, polygon, polyline, ellipse, line');
+    // Priority 2: Extract from groups if no symbols found
+    if (icons.length === 0) {
+      const groups = Array.from(rootSvg.querySelectorAll('g')).slice(0, MAX_ICONS_PER_TYPE);
+      console.log('Found groups:', groups.length);
       
-      shapes.forEach((shape, index) => {
-        const bounds = getBoundingBox(shape);
-        const icon = createIcon(shape, index, shape.tagName.toLowerCase(), bounds);
-        icons.push(icon);
-        extractedCount++;
+      groups.forEach((group, index) => {
+        // Skip groups that are just containers
+        const hasVisualContent = group.querySelector('path, circle, rect, polygon, polyline, ellipse, line');
+        if (hasVisualContent) {
+          const icon = createIcon(group, index, 'group');
+          if (icon) icons.push(icon);
+        }
+      });
+    }
+
+    // Priority 3: Extract individual paths if no groups found
+    if (icons.length === 0) {
+      const paths = Array.from(rootSvg.querySelectorAll('path')).slice(0, MAX_ICONS_PER_TYPE);
+      console.log('Found paths:', paths.length);
+      
+      paths.forEach((path, index) => {
+        const icon = createIcon(path, index, 'path');
+        if (icon) icons.push(icon);
       });
     }
 
     // Last resort: treat entire SVG as one icon
-    if (extractedCount === 0) {
+    if (icons.length === 0) {
       console.log('No individual elements found, treating entire SVG as one icon');
-      const serializer = new XMLSerializer();
-      const svgString = serializer.serializeToString(rootSvg);
-      
-      const viewBox = rootSvg.getAttribute('viewBox');
-      let width = 24, height = 24;
-      
-      if (viewBox) {
-        const [, , w, h] = viewBox.split(' ').map(Number);
-        width = w || 24;
-        height = h || 24;
-      }
+      try {
+        const serializer = new XMLSerializer();
+        const svgString = serializer.serializeToString(rootSvg);
+        
+        if (svgString.length < 50000) { // Only if not too large
+          const rootViewBox = rootSvg.getAttribute('viewBox');
+          let width = 24, height = 24;
+          
+          if (rootViewBox) {
+            const [, , w, h] = rootViewBox.split(' ').map(Number);
+            width = w || 24;
+            height = h || 24;
+          }
 
-      icons.push({
-        id: `${fileName.replace('.svg', '')}-full-${Date.now()}`,
-        svgContent: svgString,
-        name: fileName.replace('.svg', ''),
-        category: '',
-        description: '',
-        keywords: [],
-        license: '',
-        author: '',
-        dimensions: { width, height },
-        fileSize: new Blob([svgString]).size,
-      });
+          icons.push({
+            id: `${fileName.replace('.svg', '')}-full-${Date.now()}`,
+            svgContent: svgString,
+            name: fileName.replace('.svg', ''),
+            category: '',
+            description: '',
+            keywords: [],
+            license: '',
+            author: '',
+            dimensions: { width, height },
+            fileSize: new Blob([svgString]).size,
+          });
+        }
+      } catch (error) {
+        console.error('Error creating full SVG icon:', error);
+      }
     }
 
     console.log(`Extracted ${icons.length} icons from ${fileName}`);
-    return icons;
+    return icons.slice(0, 100); // Limit total icons to prevent memory issues
   };
 
   const processFiles = async () => {
@@ -274,6 +201,12 @@ export const IconExtractor: React.FC<IconExtractorProps> = ({
       console.log(`Processing file ${i + 1}/${files.length}: ${file.name}`);
       
       try {
+        // Limit file size
+        if (file.size > 10000000) { // 10MB limit
+          console.error(`File ${file.name} too large, skipping`);
+          continue;
+        }
+        
         const content = await file.text();
         console.log(`File content length: ${content.length}`);
         
@@ -281,8 +214,8 @@ export const IconExtractor: React.FC<IconExtractorProps> = ({
         allIcons.push(...extractedIcons);
         setProcessedFiles(i + 1);
         
-        // Small delay to show progress
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Small delay to prevent blocking
+        await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
         console.error(`Error processing file ${file.name}:`, error);
       }
