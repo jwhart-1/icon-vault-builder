@@ -15,11 +15,12 @@ interface IconCardProps {
 const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = ({ 
   svgContent, 
   name, 
-  size = 64 
+  size = 80 
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
+  const [viewBoxInfo, setViewBoxInfo] = useState('');
 
   if (!svgContent) {
     return (
@@ -33,18 +34,13 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
   // Create a data URL for the SVG to ensure it renders properly
   const createSVGDataUrl = (content: string) => {
     try {
-      // Clean and optimize the SVG for display - force visibility
-      let cleanSVG = content
-        .replace(/fill="none"/g, 'fill="currentColor"')
-        .replace(/stroke="none"/g, 'stroke="currentColor"')
-        .replace(/opacity="[^"]*"/g, ''); // Remove any opacity that might hide icons
-      
-      // Ensure the SVG has proper dimensions and styling for visibility
-      if (!cleanSVG.includes('fill=') && !cleanSVG.includes('stroke=')) {
-        cleanSVG = cleanSVG.replace('<svg', '<svg fill="currentColor" stroke="currentColor"');
+      // Extract viewBox info for debugging
+      const viewBoxMatch = content.match(/viewBox="([^"]+)"/);
+      if (viewBoxMatch) {
+        setViewBoxInfo(viewBoxMatch[1]);
       }
       
-      const blob = new Blob([cleanSVG], { type: 'image/svg+xml' });
+      const blob = new Blob([content], { type: 'image/svg+xml' });
       return URL.createObjectURL(blob);
     } catch (error) {
       console.error(`Failed to create data URL for ${name}:`, error);
@@ -63,18 +59,18 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
     };
   }, [svgUrl]);
 
-  // Enhanced debug logging for visibility issues
+  // Enhanced debug logging for complete icons
   useEffect(() => {
-    console.log(`SVG Icon Debug for ${name}:`, {
+    console.log(`Complete SVG Icon Debug for ${name}:`, {
       hasContent: !!svgContent,
       contentLength: svgContent?.length,
+      viewBox: viewBoxInfo,
       hasViewBox: svgContent?.includes('viewBox'),
-      viewBox: svgContent?.match(/viewBox="([^"]+)"/)?.[1],
-      hasFill: svgContent?.includes('fill='),
+      hasSvgTag: svgContent?.includes('<svg'),
       hasCurrentColor: svgContent?.includes('currentColor'),
       svgUrl: !!svgUrl
     });
-  }, [svgContent, name, svgUrl]);
+  }, [svgContent, name, svgUrl, viewBoxInfo]);
 
   if (error || !svgUrl) {
     return (
@@ -86,6 +82,7 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
           onClick={() => {
             console.log(`=== DEBUG ${name} ===`);
             console.log("SVG Content:", svgContent);
+            console.log("ViewBox:", viewBoxInfo);
             console.log("Content preview:", svgContent?.substring(0, 300));
           }}
         >
@@ -105,14 +102,15 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
           style={{ 
             width: `${size}px`,
             height: `${size}px`,
-            color: '#1f2937'
+            maxWidth: '100%',
+            maxHeight: '100%'
           }}
           onLoad={() => {
             setIsLoaded(true);
-            console.log(`Icon ${name} loaded successfully`);
+            console.log(`✅ Complete icon ${name} loaded successfully`);
           }}
           onError={() => {
-            console.error(`Icon ${name} failed to load, trying fallback`);
+            console.error(`❌ Complete icon ${name} failed to load, trying fallback`);
             setShowFallback(true);
           }}
         />
@@ -121,12 +119,13 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
           <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-2">
             <span className="text-lg">🔧</span>
           </div>
-          <div className="text-xs text-center">Icon extracted</div>
+          <div className="text-xs text-center">Complete icon extracted</div>
           <button 
             className="text-xs text-blue-500 underline mt-1"
             onClick={() => {
               console.log(`=== FALLBACK DEBUG ${name} ===`);
               console.log("SVG Content:", svgContent);
+              console.log("ViewBox:", viewBoxInfo);
               console.log("SVG URL:", svgUrl);
             }}
           >
@@ -148,8 +147,8 @@ export const IconCard: React.FC<IconCardProps> = ({
   const [showForm, setShowForm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
-  // Enhanced debug logging
-  console.log("Rendering IconCard for:", icon.name, {
+  // Enhanced debug logging for complete icons
+  console.log("Rendering IconCard for complete icon:", icon.name, {
     hasContent: !!icon.svgContent,
     contentLength: icon.svgContent?.length,
     dimensions: icon.dimensions,
@@ -182,27 +181,27 @@ export const IconCard: React.FC<IconCardProps> = ({
 
   return (
     <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:shadow-md transition-shadow">
-      {/* Icon Preview with enhanced debugging */}
-      <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-4 border min-h-32 relative">
+      {/* Larger Icon Preview for complete icons */}
+      <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-6 border" style={{ minHeight: '140px' }}>
         <SVGIcon 
           svgContent={icon.svgContent} 
           name={icon.name}
-          size={80}
+          size={100}
         />
         
-        {/* Debug info overlay (only visible in console) */}
+        {/* Debug info overlay */}
         <div className="absolute top-1 right-1">
           <button 
             className="text-xs bg-slate-100 text-slate-500 px-1 rounded opacity-50 hover:opacity-100"
             onClick={() => {
-              console.log(`=== ICON CARD DEBUG ${icon.name} ===`);
+              console.log(`=== COMPLETE ICON DEBUG ${icon.name} ===`);
               console.log("Full icon object:", icon);
               console.log("SVG Content:", icon.svgContent);
               console.log("ViewBox:", icon.svgContent?.match(/viewBox="([^"]+)"/)?.[1]);
               console.log("Dimensions:", icon.dimensions);
-              console.log("Has visible elements:", icon.svgContent?.includes('<path') || icon.svgContent?.includes('<circle') || icon.svgContent?.includes('<rect'));
+              console.log("Is complete:", icon.svgContent?.includes('<svg') && icon.svgContent?.includes('</svg>'));
             }}
-            title="Debug this icon"
+            title="Debug complete icon"
           >
             ?
           </button>
@@ -231,7 +230,7 @@ export const IconCard: React.FC<IconCardProps> = ({
           </p>
         )}
         
-        {/* Debug info */}
+        {/* Debug info for complete icons */}
         <div className="text-xs text-slate-400">
           ViewBox: {icon.svgContent?.match(/viewBox="([^"]+)"/)?.[1] || 'default'}
         </div>
@@ -286,7 +285,7 @@ export const IconCard: React.FC<IconCardProps> = ({
         />
       )}
 
-      {/* Enhanced Preview Modal */}
+      {/* Enhanced Preview Modal for complete icons */}
       {showPreview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
@@ -300,19 +299,20 @@ export const IconCard: React.FC<IconCardProps> = ({
               </button>
             </div>
             
-            <div className="bg-slate-50 rounded-lg p-8 mb-4 flex items-center justify-center min-h-48">
+            <div className="bg-slate-50 rounded-lg p-8 mb-4 flex items-center justify-center min-h-64">
               <SVGIcon 
                 svgContent={icon.svgContent} 
                 name={icon.name}
-                size={200}
+                size={240}
               />
             </div>
             
-            {/* Enhanced debug info */}
+            {/* Enhanced debug info for complete icons */}
             <div className="mb-4 p-3 bg-blue-50 rounded text-sm">
               <p><strong>ViewBox:</strong> {icon.svgContent?.match(/viewBox="([^"]+)"/)?.[1] || 'Not specified'}</p>
               <p><strong>Dimensions:</strong> {icon.dimensions.width}×{icon.dimensions.height}</p>
               <p><strong>Content Length:</strong> {icon.svgContent?.length} characters</p>
+              <p><strong>Complete Icon:</strong> {icon.svgContent?.includes('<svg') && icon.svgContent?.includes('</svg>') ? 'Yes' : 'No'}</p>
             </div>
             
             <div className="bg-slate-100 rounded p-3 text-sm font-mono overflow-auto max-h-40">

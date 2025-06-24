@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
@@ -23,28 +22,33 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     }
   }, [files]);
 
-  const calculateIconViewBox = (groupElement: Element) => {
+  const calculateFullIconViewBox = (groupElement: Element) => {
     try {
-      // Get the bounding box of all elements in this group
+      // Get bounding box of the entire group
       const bbox = (groupElement as any).getBBox();
+      console.log(`Original bbox: x=${bbox.x}, y=${bbox.y}, w=${bbox.width}, h=${bbox.height}`);
       
       if (bbox && bbox.width > 0 && bbox.height > 0) {
-        // Add some padding around the icon
-        const padding = Math.max(bbox.width, bbox.height) * 0.1;
-        const x = Math.round(bbox.x - padding);
-        const y = Math.round(bbox.y - padding);
-        const width = Math.round(bbox.width + (padding * 2));
-        const height = Math.round(bbox.height + (padding * 2));
+        // Add significant padding to ensure we see the whole icon
+        const paddingPercent = 0.4; // 40% padding to be extra safe
+        const xPadding = bbox.width * paddingPercent;
+        const yPadding = bbox.height * paddingPercent;
         
-        console.log(`Calculated viewBox: ${x} ${y} ${width} ${height} for bbox:`, bbox);
-        return `${x} ${y} ${width} ${height}`;
+        const x = Math.round(bbox.x - xPadding);
+        const y = Math.round(bbox.y - yPadding);
+        const width = Math.round(bbox.width + (xPadding * 2));
+        const height = Math.round(bbox.height + (yPadding * 2));
+        
+        const viewBox = `${x} ${y} ${width} ${height}`;
+        console.log(`Calculated full viewBox: ${viewBox}`);
+        return viewBox;
       }
     } catch (error) {
-      console.warn("Could not calculate bbox:", error);
+      console.warn("Could not calculate bbox, using large fallback:", error);
     }
     
-    // Fallback viewBox
-    return "0 0 24 24";
+    // Much larger fallback viewBox to ensure complete icons
+    return "-100 -100 200 200";
   };
 
   const getElementDimensions = (element: Element) => {
@@ -65,9 +69,13 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     return { width: 24, height: 24, x: 0, y: 0 };
   };
 
-  const createIndividualIconSVG = (element: Element, originalSVG: Element): string => {
-    // Calculate the proper viewBox for this specific icon
-    const iconViewBox = calculateIconViewBox(element);
+  const createCompleteIconSVG = (element: Element, originalSVG: Element): string => {
+    // Try to get original SVG viewBox first for context
+    const originalViewBox = originalSVG.getAttribute('viewBox');
+    console.log("Original SVG viewBox:", originalViewBox);
+    
+    // Calculate viewBox that shows the complete icon
+    const iconViewBox = calculateFullIconViewBox(element);
     
     // Clone the element to avoid modifying the original
     const clonedElement = element.cloneNode(true) as Element;
@@ -102,12 +110,12 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
       }
     }
     
-    // Create SVG with calculated viewBox and explicit styling
-    const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${iconViewBox}" width="64" height="64" fill="currentColor" stroke="currentColor" stroke-width="0.5">
+    // Create SVG with calculated viewBox that should show complete icons
+    const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${iconViewBox}" width="80" height="80" fill="currentColor" stroke="currentColor" stroke-width="0.5">
 ${clonedElement.outerHTML}
 </svg>`;
     
-    console.log(`Created icon SVG with viewBox ${iconViewBox}:`, iconSVG.substring(0, 200));
+    console.log(`Created complete icon SVG with viewBox ${iconViewBox}:`, iconSVG.substring(0, 200));
     return iconSVG;
   };
 
@@ -190,7 +198,7 @@ ${clonedElement.outerHTML}
   };
 
   const extractIconsFromSVG = async (svgContent: string, fileName: string): Promise<ExtractedIcon[]> => {
-    console.log("=== EXTRACTING ICONS FROM SVG ===");
+    console.log("=== EXTRACTING COMPLETE ICONS FROM SVG ===");
     console.log("File name:", fileName);
     console.log("SVG content length:", svgContent.length);
     
@@ -206,6 +214,7 @@ ${clonedElement.outerHTML}
     
     const svgElement = svgDoc.documentElement;
     console.log("SVG root element:", svgElement.tagName);
+    console.log("Original viewBox:", svgElement.getAttribute('viewBox'));
     
     const extractedIcons: ExtractedIcon[] = [];
     
@@ -224,7 +233,7 @@ ${clonedElement.outerHTML}
       const totalElements = paths.length + circles.length + rects.length + polygons.length + lines.length;
       
       if (totalElements > 0) {
-        const iconSVG = createIndividualIconSVG(symbol, svgElement);
+        const iconSVG = createCompleteIconSVG(symbol, svgElement);
         const symbolId = symbol.getAttribute('id') || `symbol-${index}`;
         const dims = getElementDimensions(symbol);
         
@@ -241,13 +250,13 @@ ${clonedElement.outerHTML}
           fileSize: new Blob([iconSVG]).size,
         });
         
-        console.log(`✓ Extracted symbol: ${symbolId} with ${totalElements} elements`);
+        console.log(`✓ Extracted complete symbol: ${symbolId} with ${totalElements} elements`);
       }
     });
 
     // STRATEGY 2: Look for <g> groups (most common for icon sets)
     if (extractedIcons.length < 5) {
-      setCurrentStrategy('Extracting group elements...');
+      setCurrentStrategy('Extracting group elements with complete viewBoxes...');
       const allGroups = Array.from(svgElement.querySelectorAll('g'));
       console.log(`Found ${allGroups.length} total groups`);
       
@@ -263,7 +272,7 @@ ${clonedElement.outerHTML}
         
         // If this group has drawing elements, it's likely an individual icon
         if (totalElements > 0 && totalElements < 50) { // Reasonable complexity for a single icon
-          const iconSVG = createIndividualIconSVG(group, svgElement);
+          const iconSVG = createCompleteIconSVG(group, svgElement);
           const groupId = group.getAttribute('id') || group.getAttribute('class') || `group-${index}`;
           const dims = getElementDimensions(group);
           
@@ -282,14 +291,14 @@ ${clonedElement.outerHTML}
             fileSize: new Blob([iconSVG]).size,
           });
           
-          console.log(`✓ Extracted icon ${index + 1} with ${totalElements} elements, dims: ${dims.width}x${dims.height}`);
+          console.log(`✓ Extracted complete icon ${index + 1} with ${totalElements} elements, dims: ${dims.width}x${dims.height}`);
         }
       });
     }
     
     // STRATEGY 3: If no groups found, look for direct child elements
     if (extractedIcons.length === 0) {
-      setCurrentStrategy('Extracting direct elements...');
+      setCurrentStrategy('Extracting direct elements with full visibility...');
       console.log("No groups found, trying direct child elements...");
       
       const directPaths = Array.from(svgElement.querySelectorAll('svg > path'));
@@ -298,7 +307,7 @@ ${clonedElement.outerHTML}
       console.log(`Found ${directPaths.length} direct paths, ${directShapes.length} direct shapes`);
       
       [...directPaths, ...directShapes].slice(0, 30).forEach((element, index) => {
-        const iconSVG = createIndividualIconSVG(element, svgElement);
+        const iconSVG = createCompleteIconSVG(element, svgElement);
         const dims = getElementDimensions(element);
         
         extractedIcons.push({
@@ -324,18 +333,16 @@ ${clonedElement.outerHTML}
       extractedIcons.push(...gridIcons);
     }
     
-    console.log(`=== EXTRACTION COMPLETE: ${extractedIcons.length} icons ===`);
+    console.log(`=== EXTRACTION COMPLETE: ${extractedIcons.length} complete icons ===`);
     
-    // Debug the first few extracted icons with enhanced logging
-    console.log("=== SVG DEBUG INFO ===");
+    // Enhanced debug logging for complete icons
+    console.log("=== COMPLETE ICON DEBUG INFO ===");
     extractedIcons.slice(0, 3).forEach((icon, index) => {
-      console.log(`Icon ${index} (${icon.name}):`);
+      console.log(`Complete Icon ${index} (${icon.name}):`);
       console.log("SVG Content:", icon.svgContent);
       console.log("Content length:", icon.svgContent?.length);
-      console.log("Has <svg> tag:", icon.svgContent?.includes('<svg'));
-      console.log("Has paths:", icon.svgContent?.includes('<path'));
-      console.log("Has currentColor:", icon.svgContent?.includes('currentColor'));  
       console.log("ViewBox:", icon.svgContent?.match(/viewBox="([^"]+)"/)?.[1]);
+      console.log("Has complete structure:", icon.svgContent?.includes('<svg') && icon.svgContent?.includes('</svg>'));
       console.log("---");
     });
     
@@ -399,7 +406,7 @@ ${clonedElement.outerHTML}
             Smart Icon Extraction
           </h3>
           <p className="text-slate-500 mb-4">
-            {currentStrategy || 'Parsing SVG content and extracting individual icons...'}
+            {currentStrategy || 'Extracting complete icons with proper viewBoxes...'}
           </p>
         </div>
         
