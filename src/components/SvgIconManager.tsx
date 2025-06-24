@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
-import { IconExtractor } from './IconExtractor';
+import { AdvancedIconExtractor } from './AdvancedIconExtractor';
 import { IconGrid } from './IconGrid';
 import { SearchAndFilter } from './SearchAndFilter';
+import { useIconStorage } from '@/hooks/useIconStorage';
 import { useToast } from '@/hooks/use-toast';
 
 export interface ExtractedIcon {
@@ -26,7 +27,17 @@ export const SvgIconManager = () => {
   const [currentStep, setCurrentStep] = useState<'upload' | 'extract' | 'manage'>('upload');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const { saveIcon, loadIcons, deleteIcon, isLoading } = useIconStorage();
   const { toast } = useToast();
+
+  // Load saved icons on component mount
+  useEffect(() => {
+    const loadSavedIcons = async () => {
+      const icons = await loadIcons();
+      setSavedIcons(icons);
+    };
+    loadSavedIcons();
+  }, []);
 
   const handleFilesUploaded = (files: File[]) => {
     setUploadedFiles(files);
@@ -46,13 +57,19 @@ export const SvgIconManager = () => {
     });
   };
 
-  const handleIconSaved = (icon: ExtractedIcon) => {
-    setSavedIcons(prev => [...prev, icon]);
-    setExtractedIcons(prev => prev.filter(i => i.id !== icon.id));
-    toast({
-      title: 'Icon saved',
-      description: `${icon.name} has been saved to your library`,
-    });
+  const handleIconSaved = async (icon: ExtractedIcon) => {
+    const success = await saveIcon(icon);
+    if (success) {
+      setSavedIcons(prev => [...prev, icon]);
+      setExtractedIcons(prev => prev.filter(i => i.id !== icon.id));
+    }
+  };
+
+  const handleIconDeleted = async (iconId: string) => {
+    const success = await deleteIcon(iconId);
+    if (success) {
+      setSavedIcons(prev => prev.filter(i => i.id !== iconId));
+    }
   };
 
   const filteredIcons = savedIcons.filter(icon => {
@@ -98,7 +115,7 @@ export const SvgIconManager = () => {
       )}
 
       {currentStep === 'extract' && (
-        <IconExtractor files={uploadedFiles} onIconsExtracted={handleIconsExtracted} />
+        <AdvancedIconExtractor files={uploadedFiles} onIconsExtracted={handleIconsExtracted} />
       )}
 
       {currentStep === 'manage' && (
@@ -109,7 +126,9 @@ export const SvgIconManager = () => {
               <IconGrid 
                 icons={extractedIcons} 
                 onIconSaved={handleIconSaved}
+                onIconDeleted={() => {}}
                 showMetadataForms={true}
+                isLoading={isLoading}
               />
             </div>
           )}
@@ -129,7 +148,9 @@ export const SvgIconManager = () => {
               <IconGrid 
                 icons={filteredIcons} 
                 onIconSaved={() => {}}
+                onIconDeleted={handleIconDeleted}
                 showMetadataForms={false}
+                isLoading={isLoading}
               />
             </div>
           )}

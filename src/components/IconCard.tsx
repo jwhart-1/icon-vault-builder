@@ -2,25 +2,35 @@
 import React, { useState } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
 import { IconMetadataForm } from './IconMetadataForm';
-import { Download, Eye } from 'lucide-react';
+import { Download, Eye, Trash2 } from 'lucide-react';
 
 interface IconCardProps {
   icon: ExtractedIcon;
   onSave: (icon: ExtractedIcon) => void;
+  onDelete: (iconId: string) => void;
   showMetadataForm: boolean;
+  isLoading?: boolean;
 }
 
 export const IconCard: React.FC<IconCardProps> = ({
   icon,
   onSave,
+  onDelete,
   showMetadataForm,
+  isLoading = false,
 }) => {
   const [showForm, setShowForm] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [show/> = useState(false);
 
   const handleSave = (updatedIcon: ExtractedIcon) => {
     onSave(updatedIcon);
     setShowForm(false);
+  };
+
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to delete this icon?')) {
+      onDelete(icon.id);
+    }
   };
 
   const downloadIcon = () => {
@@ -74,9 +84,10 @@ export const IconCard: React.FC<IconCardProps> = ({
         {showMetadataForm && (
           <button
             onClick={() => setShowForm(true)}
-            className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            disabled={isLoading}
+            className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
           >
-            Add Metadata
+            {isLoading ? 'Saving...' : 'Add Metadata'}
           </button>
         )}
         
@@ -95,6 +106,17 @@ export const IconCard: React.FC<IconCardProps> = ({
         >
           <Download className="h-4 w-4" />
         </button>
+
+        {!showMetadataForm && (
+          <button
+            onClick={handleDelete}
+            disabled={isLoading}
+            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
+            title="Delete"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Metadata Form Modal */}
