@@ -15,70 +15,109 @@ interface IconCardProps {
 const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = ({ 
   svgContent, 
   name, 
-  size = 100 
+  size = 120 
 }) => {
-  if (!svgContent) {
+  // Enhanced debug logging
+  console.log(`=== SVGIcon Debug for ${name} ===`);
+  console.log('Has content:', !!svgContent);
+  console.log('Content length:', svgContent?.length);
+  console.log('First 200 chars:', svgContent?.substring(0, 200));
+  console.log('Starts with <svg:', svgContent?.startsWith('<svg'));
+  console.log('Contains </svg>:', svgContent?.includes('</svg>'));
+  console.log('================================');
+
+  if (!svgContent || svgContent.trim().length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center text-slate-400 text-sm">
-        <div className="text-2xl mb-2">🔧</div>
-        <div>No icon content</div>
+      <div className="flex flex-col items-center justify-center text-slate-400 text-sm h-full">
+        <div className="text-2xl mb-2">📄</div>
+        <div>No Content</div>
       </div>
     );
   }
 
   try {
-    // Parse and clean the SVG content
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgContent, 'image/svg+xml');
-    const svgElement = doc.querySelector('svg');
+    // Clean and prepare SVG content
+    let cleanSvg = svgContent.trim();
     
-    if (!svgElement) {
-      throw new Error('Invalid SVG content');
+    // Ensure SVG has proper structure
+    if (!cleanSvg.startsWith('<svg')) {
+      console.error(`Invalid SVG for ${name}: doesn't start with <svg>`);
+      throw new Error('Invalid SVG structure');
     }
 
-    // Ensure proper sizing and styling
+    // Parse the SVG to validate and enhance it
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(cleanSvg, 'image/svg+xml');
+    
+    // Check for parser errors
+    const parseError = doc.querySelector('parsererror');
+    if (parseError) {
+      console.error(`SVG Parse error for ${name}:`, parseError.textContent);
+      throw new Error('SVG parsing failed');
+    }
+
+    const svgElement = doc.documentElement;
+    
+    if (svgElement.tagName !== 'svg') {
+      console.error(`Not an SVG element for ${name}:`, svgElement.tagName);
+      throw new Error('Not a valid SVG');
+    }
+
+    // Enhance SVG for better visibility
     svgElement.setAttribute('width', size.toString());
     svgElement.setAttribute('height', size.toString());
+    svgElement.style.display = 'block';
     svgElement.style.maxWidth = '100%';
     svgElement.style.maxHeight = '100%';
+
+    // Ensure visibility - add fill if none exists
+    const allPaths = svgElement.querySelectorAll('path, circle, rect, polygon, line, ellipse');
+    let hasVisibleElements = false;
     
-    // Ensure visibility
-    if (!svgElement.getAttribute('fill') && !svgElement.querySelector('[fill]')) {
+    allPaths.forEach(element => {
+      const fill = element.getAttribute('fill');
+      const stroke = element.getAttribute('stroke');
+      
+      if (!fill && !stroke) {
+        element.setAttribute('fill', 'currentColor');
+        hasVisibleElements = true;
+      } else if (fill !== 'none' || stroke) {
+        hasVisibleElements = true;
+      }
+    });
+
+    if (!hasVisibleElements) {
+      // If no visible elements found, set fill on the SVG itself
       svgElement.setAttribute('fill', 'currentColor');
     }
 
-    console.log(`Rendering icon: ${name}`, {
-      hasContent: !!svgContent,
-      contentLength: svgContent?.length,
-      contentPreview: svgContent?.substring(0, 200),
-      isValidSVG: svgContent?.includes('<svg') && svgContent?.includes('</svg>'),
-      hasViewBox: svgContent?.includes('viewBox'),
-      svgElementFound: !!svgElement
-    });
+    const finalSvg = svgElement.outerHTML;
+    console.log(`Successfully processed SVG for ${name}, final length: ${finalSvg.length}`);
 
     return (
       <div 
-        className="flex items-center justify-center"
-        style={{ width: size, height: size }}
-        dangerouslySetInnerHTML={{ __html: svgElement.outerHTML }}
+        className="flex items-center justify-center w-full h-full text-slate-700"
+        style={{ 
+          width: `${size}px`, 
+          height: `${size}px`,
+          minWidth: `${size}px`,
+          minHeight: `${size}px`
+        }}
+        dangerouslySetInnerHTML={{ __html: finalSvg }}
       />
     );
+
   } catch (error) {
     console.error(`Failed to render SVG for ${name}:`, error);
+    console.log(`SVG content that failed:`, svgContent?.substring(0, 500));
+    
     return (
-      <div className="flex flex-col items-center justify-center text-slate-400 text-sm">
+      <div className="flex flex-col items-center justify-center text-red-400 text-sm h-full">
         <div className="text-2xl mb-2">⚠️</div>
-        <div>Render error</div>
-        <button 
-          className="text-xs text-blue-500 underline mt-1"
-          onClick={() => {
-            console.log(`=== DEBUG ${name} ===`);
-            console.log("SVG Content:", svgContent);
-            console.log("Content preview:", svgContent?.substring(0, 300));
-          }}
-        >
-          Debug
-        </button>
+        <div className="text-center">
+          <div>Render Error</div>
+          <div className="text-xs mt-1">{error.message}</div>
+        </div>
       </div>
     );
   }
@@ -93,6 +132,16 @@ export const IconCard: React.FC<IconCardProps> = ({
 }) => {
   const [showForm, setShowForm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+
+  // Add comprehensive debugging at component level
+  console.log(`=== IconCard Debug for ${icon.name} ===`);
+  console.log('Icon object:', icon);
+  console.log('SVG Content exists:', !!icon.svgContent);
+  console.log('SVG Content length:', icon.svgContent?.length);
+  console.log('SVG Content preview:', icon.svgContent?.substring(0, 200));
+  console.log('Has svg tag:', icon.svgContent?.includes('<svg'));
+  console.log('Has closing svg tag:', icon.svgContent?.includes('</svg>'));
+  console.log('==============================');
 
   const handleSave = (updatedIcon: ExtractedIcon) => {
     onSave(updatedIcon);
@@ -119,8 +168,13 @@ export const IconCard: React.FC<IconCardProps> = ({
 
   return (
     <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:shadow-md transition-shadow">
-      {/* Icon Preview */}
-      <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-8 border" style={{ minHeight: '160px' }}>
+      {/* Icon Preview - Fixed dimensions */}
+      <div className="bg-white rounded-lg mb-4 flex items-center justify-center border" style={{ 
+        width: '160px', 
+        height: '160px',
+        minHeight: '160px',
+        minWidth: '160px'
+      }}>
         <SVGIcon 
           svgContent={icon.svgContent} 
           name={icon.name}
