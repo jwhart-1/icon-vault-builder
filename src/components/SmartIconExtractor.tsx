@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
 import { SvgAnalyzer } from './SvgAnalyzer';
@@ -25,29 +24,26 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
   }, [files]);
 
   const createStandaloneIcon = (element: Element, originalViewBox: string = '0 0 24 24'): string => {
-    // Create a clean SVG wrapper with the original viewBox
-    const svgWrapper = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svgWrapper.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    svgWrapper.setAttribute('viewBox', originalViewBox);
-    svgWrapper.setAttribute('fill', 'currentColor');
+    const serializer = new XMLSerializer();
+    let innerContent = '';
     
-    // Clone the element to avoid modifying the original
-    const clonedElement = element.cloneNode(true) as Element;
-    
-    // If it's a group, we want its children, not the group wrapper itself
+    // If it's a group, get all its children
     if (element.tagName.toLowerCase() === 'g') {
-      // Add all children of the group directly to the SVG
-      Array.from(clonedElement.children).forEach(child => {
-        svgWrapper.appendChild(child.cloneNode(true));
+      // Serialize all children of the group
+      Array.from(element.children).forEach(child => {
+        innerContent += serializer.serializeToString(child);
       });
     } else {
-      // For non-group elements, add the element itself
-      svgWrapper.appendChild(clonedElement);
+      // For non-group elements, serialize the element itself
+      innerContent = serializer.serializeToString(element);
     }
     
-    // Serialize to string
-    const serializer = new XMLSerializer();
-    return serializer.serializeToString(svgWrapper);
+    // Create a clean SVG wrapper
+    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${originalViewBox}" fill="currentColor">${innerContent}</svg>`;
+    
+    console.log('Created SVG content preview:', svgContent.substring(0, 200) + '...');
+    
+    return svgContent;
   };
 
   const isValidIconElement = (element: Element): boolean => {
@@ -117,7 +113,6 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
         const svgWrapper = createStandaloneIcon(symbol, viewBox);
         
         console.log(`Creating symbol icon: ${iconId}`);
-        console.log('Symbol SVG content preview:', svgWrapper.substring(0, 200) + '...');
         
         icons.push({
           id: `${fileName}-symbol-${iconId}-${Date.now()}-${index}`,
@@ -147,7 +142,6 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
           const svgWrapper = createStandaloneIcon(group, viewBox);
           
           console.log(`Creating group icon: ${groupId}`);
-          console.log('Group SVG content preview:', svgWrapper.substring(0, 200) + '...');
           
           icons.push({
             id: `${fileName}-group-${groupId}-${Date.now()}-${index}`,
@@ -181,7 +175,6 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
           const svgWrapper = createStandaloneIcon(group, viewBox);
           
           console.log(`Creating auto group icon ${validGroupCount + 1}: ${groupId}`);
-          console.log('Auto group SVG preview:', svgWrapper.substring(0, 150) + '...');
           
           icons.push({
             id: `${fileName}-auto-${validGroupCount}-${Date.now()}`,
@@ -213,7 +206,6 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
           const svgWrapper = createStandaloneIcon(path, viewBox);
           
           console.log(`Creating path icon ${index + 1}`);
-          console.log('Path SVG preview:', svgWrapper.substring(0, 150) + '...');
           
           icons.push({
             id: `${fileName}-path-${index}-${Date.now()}`,
@@ -243,6 +235,8 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     const finalIcons = uniqueIcons.slice(0, finalCount);
     
     console.log(`Successfully extracted ${finalIcons.length} unique icons from ${fileName}`);
+    console.log('Sample icon SVG:', finalIcons[0]?.svgContent?.substring(0, 300));
+    
     setExtractionStats(prev => [...prev, `${fileName}: ${finalIcons.length} icons extracted`]);
     
     return finalIcons;
