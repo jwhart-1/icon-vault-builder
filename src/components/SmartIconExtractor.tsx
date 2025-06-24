@@ -111,12 +111,17 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     }
     
     // Create SVG with calculated viewBox that should show complete icons
-    const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${iconViewBox}" width="80" height="80" fill="currentColor" stroke="currentColor" stroke-width="0.5">
+    const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${iconViewBox}" width="100" height="100" fill="currentColor" stroke="currentColor" stroke-width="0.5">
 ${clonedElement.outerHTML}
 </svg>`;
     
     console.log(`Created complete icon SVG with viewBox ${iconViewBox}:`, iconSVG.substring(0, 200));
     return iconSVG;
+  };
+
+  const createIndividualIconSVG = (element: Element, originalSVG: Element): string => {
+    // This is the missing function - use the same logic as createCompleteIconSVG
+    return createCompleteIconSVG(element, originalSVG);
   };
 
   const detectGridIcons = (svgElement: Element, fileName: string): ExtractedIcon[] => {
