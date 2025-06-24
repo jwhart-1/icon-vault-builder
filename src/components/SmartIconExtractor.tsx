@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
@@ -42,8 +41,8 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
   };
 
   const createIndividualIconSVG = (element: Element, originalSVG: Element): string => {
-    // Get the original viewBox or create one
-    const originalViewBox = originalSVG.getAttribute('viewBox') || '0 0 24 24';
+    // Use a standard 24x24 viewBox for consistency
+    const viewBox = '0 0 24 24';
     
     // Get any relevant attributes from the original SVG
     const xmlns = originalSVG.getAttribute('xmlns') || 'http://www.w3.org/2000/svg';
@@ -56,13 +55,14 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     const defsElement = originalSVG.querySelector('defs');
     const defsContent = defsElement ? defsElement.outerHTML : '';
     
-    // Create a standalone SVG for this icon
-    const iconSVG = `<svg xmlns="${xmlns}" viewBox="${originalViewBox}" width="24" height="24" fill="currentColor" stroke="currentColor">
+    // Create a standalone SVG for this icon with proper styling
+    const iconSVG = `<svg xmlns="${xmlns}" viewBox="${viewBox}" width="48" height="48" fill="currentColor" stroke="currentColor" stroke-width="1">
   ${defsContent}
   ${styleContent}
   ${element.outerHTML}
 </svg>`;
     
+    console.log(`Created icon SVG (${iconSVG.length} chars):`, iconSVG.substring(0, 200));
     return iconSVG;
   };
 
@@ -185,6 +185,9 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
         const iconSVG = createIndividualIconSVG(symbol, svgElement);
         const symbolId = symbol.getAttribute('id') || `symbol-${index}`;
         
+        console.log(`Symbol ${index} SVG:`, iconSVG.substring(0, 200));
+        console.log(`Symbol ${index} original:`, symbol.outerHTML.substring(0, 200));
+        
         extractedIcons.push({
           id: `${fileName}-symbol-${symbolId}-${Date.now()}-${index}`,
           svgContent: iconSVG,
@@ -225,6 +228,9 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
           const iconSVG = createIndividualIconSVG(group, svgElement);
           const groupId = group.getAttribute('id') || group.getAttribute('class') || `group-${index}`;
           
+          console.log(`Group ${index} SVG:`, iconSVG.substring(0, 200));
+          console.log(`Group ${index} original:`, group.outerHTML.substring(0, 200));
+          
           extractedIcons.push({
             id: `${fileName}-group-${groupId}-${Date.now()}-${index}`,
             svgContent: iconSVG,
@@ -258,6 +264,8 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
       [...directPaths, ...directShapes].slice(0, 30).forEach((element, index) => {
         const iconSVG = createIndividualIconSVG(element, svgElement);
         
+        console.log(`Direct element ${index} SVG:`, iconSVG.substring(0, 200));
+        
         extractedIcons.push({
           id: `${fileName}-direct-${Date.now()}-${index}`,
           svgContent: iconSVG,
@@ -282,6 +290,17 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     }
     
     console.log(`=== EXTRACTION COMPLETE: ${extractedIcons.length} icons ===`);
+    
+    // Log a sample of the extracted icons for debugging
+    extractedIcons.slice(0, 3).forEach((icon, index) => {
+      console.log(`Sample icon ${index}:`, {
+        name: icon.name,
+        hasContent: !!icon.svgContent,
+        contentLength: icon.svgContent?.length,
+        contentPreview: icon.svgContent?.substring(0, 100)
+      });
+    });
+    
     return extractedIcons;
   };
 

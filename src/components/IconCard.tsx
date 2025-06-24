@@ -22,6 +22,13 @@ export const IconCard: React.FC<IconCardProps> = ({
   const [showForm, setShowForm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
+  // Debug logging
+  console.log("Rendering IconCard for:", icon.name, {
+    hasContent: !!icon.svgContent,
+    contentLength: icon.svgContent?.length,
+    contentPreview: icon.svgContent?.substring(0, 100)
+  });
+
   const handleSave = (updatedIcon: ExtractedIcon) => {
     onSave(updatedIcon);
     setShowForm(false);
@@ -48,12 +55,23 @@ export const IconCard: React.FC<IconCardProps> = ({
   return (
     <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:shadow-md transition-shadow">
       {/* Icon Preview */}
-      <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-4 border">
-        <div
-          className="max-w-full max-h-full flex items-center justify-center"
-          style={{ width: '120px', height: '120px' }}
-          dangerouslySetInnerHTML={{ __html: icon.svgContent }}
-        />
+      <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-4 border min-h-32">
+        {icon.svgContent ? (
+          <div
+            className="flex items-center justify-center w-full h-full"
+            style={{ 
+              width: '120px', 
+              height: '120px',
+              maxWidth: '100%',
+              maxHeight: '100%'
+            }}
+            dangerouslySetInnerHTML={{ __html: icon.svgContent }}
+          />
+        ) : (
+          <div className="flex items-center justify-center w-full h-full text-slate-400 text-sm">
+            No preview available
+          </div>
+        )}
       </div>
 
       {/* Icon Info */}
@@ -142,11 +160,16 @@ export const IconCard: React.FC<IconCardProps> = ({
               </button>
             </div>
             
-            <div className="bg-slate-50 rounded-lg p-8 mb-4 flex items-center justify-center">
-              <div
-                className="w-48 h-48 flex items-center justify-center"
-                dangerouslySetInnerHTML={{ __html: icon.svgContent }}
-              />
+            <div className="bg-slate-50 rounded-lg p-8 mb-4 flex items-center justify-center min-h-48">
+              {icon.svgContent ? (
+                <div
+                  className="flex items-center justify-center"
+                  style={{ width: '200px', height: '200px' }}
+                  dangerouslySetInnerHTML={{ __html: icon.svgContent }}
+                />
+              ) : (
+                <div className="text-slate-400">No preview available</div>
+              )}
             </div>
             
             <div className="bg-slate-100 rounded p-3 text-sm font-mono overflow-auto max-h-40">
