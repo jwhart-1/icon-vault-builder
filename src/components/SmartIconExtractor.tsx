@@ -41,32 +41,40 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
   };
 
   const createIndividualIconSVG = (element: Element, originalSVG: Element): string => {
-    // Get dimensions from the element
-    const dims = getElementDimensions(element);
-    const width = Math.max(24, dims.width);
-    const height = Math.max(24, dims.height);
-    
-    // Use a proper viewBox
-    const viewBox = `0 0 ${width} ${height}`;
-    
-    // Get any relevant attributes from the original SVG
-    const xmlns = originalSVG.getAttribute('xmlns') || 'http://www.w3.org/2000/svg';
+    // Get viewBox from original SVG or use default
+    let viewBox = originalSVG.getAttribute('viewBox') || '0 0 24 24';
     
     // Clone the element to avoid modifying the original
     const clonedElement = element.cloneNode(true) as Element;
     
-    // Ensure the element has proper styling
-    if (clonedElement.tagName === 'g') {
+    // Clean up any problematic attributes that might hide the icon
+    clonedElement.removeAttribute('transform');
+    
+    // Ensure the element has proper styling for visibility
+    const tagName = clonedElement.tagName.toLowerCase();
+    if (tagName === 'g') {
       clonedElement.setAttribute('fill', 'currentColor');
       clonedElement.setAttribute('stroke', 'currentColor');
+    } else if (tagName === 'path') {
+      if (!clonedElement.getAttribute('fill') || clonedElement.getAttribute('fill') === 'none') {
+        clonedElement.setAttribute('fill', 'currentColor');
+      }
     }
     
-    // Create a standalone SVG for this icon
-    const iconSVG = `<svg xmlns="${xmlns}" viewBox="${viewBox}" width="24" height="24" fill="currentColor">
+    // Get all child elements and ensure they're visible
+    const childPaths = clonedElement.querySelectorAll('path');
+    childPaths.forEach(path => {
+      if (!path.getAttribute('fill') || path.getAttribute('fill') === 'none') {
+        path.setAttribute('fill', 'currentColor');
+      }
+    });
+    
+    // Create a clean, visible SVG with explicit styling
+    const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="64" height="64" fill="currentColor" stroke="currentColor" stroke-width="0.5">
 ${clonedElement.outerHTML}
 </svg>`;
     
-    console.log(`Created icon SVG (${iconSVG.length} chars) with dims ${width}x${height}:`, iconSVG.substring(0, 200));
+    console.log(`Created visible SVG (${iconSVG.length} chars):`, iconSVG.substring(0, 200));
     return iconSVG;
   };
 
@@ -127,6 +135,7 @@ ${clonedElement.outerHTML}
       
       rowItems.slice(0, 20).forEach((item, colIndex) => { // Limit to 20 per row
         const iconSVG = createIndividualIconSVG(item.element, svgElement);
+        const dims = getElementDimensions(item.element);
         
         gridIcons.push({
           id: `grid-icon-${Date.now()}-${rowY}-${colIndex}`,
@@ -137,7 +146,7 @@ ${clonedElement.outerHTML}
           keywords: ['grid', 'detected'],
           license: '',
           author: '',
-          dimensions: { width: Math.max(24, item.width), height: Math.max(24, item.height) },
+          dimensions: dims,
           fileSize: new Blob([iconSVG]).size,
         });
       });
@@ -151,7 +160,6 @@ ${clonedElement.outerHTML}
     console.log("=== EXTRACTING ICONS FROM SVG ===");
     console.log("File name:", fileName);
     console.log("SVG content length:", svgContent.length);
-    console.log("First 200 chars:", svgContent.substring(0, 200));
     
     // Parse the SVG content
     const parser = new DOMParser();
@@ -165,9 +173,6 @@ ${clonedElement.outerHTML}
     
     const svgElement = svgDoc.documentElement;
     console.log("SVG root element:", svgElement.tagName);
-    console.log("SVG viewBox:", svgElement.getAttribute('viewBox'));
-    console.log("SVG width:", svgElement.getAttribute('width'));
-    console.log("SVG height:", svgElement.getAttribute('height'));
     
     const extractedIcons: ExtractedIcon[] = [];
     
@@ -189,9 +194,6 @@ ${clonedElement.outerHTML}
         const iconSVG = createIndividualIconSVG(symbol, svgElement);
         const symbolId = symbol.getAttribute('id') || `symbol-${index}`;
         const dims = getElementDimensions(symbol);
-        
-        console.log(`Symbol ${index} SVG:`, iconSVG.substring(0, 200));
-        console.log(`Symbol ${index} dimensions:`, dims);
         
         extractedIcons.push({
           id: `${fileName}-symbol-${symbolId}-${Date.now()}-${index}`,
@@ -226,16 +228,11 @@ ${clonedElement.outerHTML}
         
         const totalElements = paths.length + circles.length + rects.length + polygons.length + lines.length;
         
-        console.log(`Group ${index}: ${totalElements} drawing elements`);
-        
         // If this group has drawing elements, it's likely an individual icon
         if (totalElements > 0 && totalElements < 50) { // Reasonable complexity for a single icon
           const iconSVG = createIndividualIconSVG(group, svgElement);
           const groupId = group.getAttribute('id') || group.getAttribute('class') || `group-${index}`;
           const dims = getElementDimensions(group);
-          
-          console.log(`Group ${index} SVG:`, iconSVG.substring(0, 200));
-          console.log(`Group ${index} dimensions:`, dims);
           
           extractedIcons.push({
             id: `${fileName}-group-${groupId}-${Date.now()}-${index}`,
@@ -271,9 +268,6 @@ ${clonedElement.outerHTML}
         const iconSVG = createIndividualIconSVG(element, svgElement);
         const dims = getElementDimensions(element);
         
-        console.log(`Direct element ${index} SVG:`, iconSVG.substring(0, 200));
-        console.log(`Direct element ${index} dimensions:`, dims);
-        
         extractedIcons.push({
           id: `${fileName}-direct-${Date.now()}-${index}`,
           svgContent: iconSVG,
@@ -299,15 +293,16 @@ ${clonedElement.outerHTML}
     
     console.log(`=== EXTRACTION COMPLETE: ${extractedIcons.length} icons ===`);
     
-    // Log a sample of the extracted icons for debugging
+    // Debug the extracted icons
+    console.log("=== SVG DEBUG INFO ===");
     extractedIcons.slice(0, 3).forEach((icon, index) => {
-      console.log(`Sample icon ${index}:`, {
-        name: icon.name,
-        hasContent: !!icon.svgContent,
-        contentLength: icon.svgContent?.length,
-        dimensions: icon.dimensions,
-        contentPreview: icon.svgContent?.substring(0, 100)
-      });
+      console.log(`Icon ${index} (${icon.name}):`);
+      console.log("SVG Content:", icon.svgContent);
+      console.log("Content length:", icon.svgContent?.length);
+      console.log("Has <svg> tag:", icon.svgContent?.includes('<svg'));
+      console.log("Has paths:", icon.svgContent?.includes('<path'));
+      console.log("Has currentColor:", icon.svgContent?.includes('currentColor'));
+      console.log("---");
     });
     
     return extractedIcons;

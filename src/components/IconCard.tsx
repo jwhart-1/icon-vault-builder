@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
 import { IconMetadataForm } from './IconMetadataForm';
 import { Download, Eye, Trash2 } from 'lucide-react';
@@ -11,6 +11,86 @@ interface IconCardProps {
   showMetadataForm: boolean;
   isLoading?: boolean;
 }
+
+const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = ({ 
+  svgContent, 
+  name, 
+  size = 64 
+}) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  if (!svgContent) {
+    return (
+      <div className="flex flex-col items-center justify-center text-slate-400 text-sm">
+        <div className="text-2xl mb-2">🔧</div>
+        <div>No icon content</div>
+      </div>
+    );
+  }
+
+  // Create a data URL for the SVG to ensure it renders properly
+  const createSVGDataUrl = (content: string) => {
+    try {
+      // Clean and optimize the SVG for display
+      let cleanSVG = content
+        .replace(/fill="none"/g, 'fill="currentColor"')
+        .replace(/stroke="none"/g, 'stroke="currentColor"');
+      
+      // Ensure the SVG has proper dimensions and styling
+      if (!cleanSVG.includes('fill=')) {
+        cleanSVG = cleanSVG.replace('<svg', '<svg fill="currentColor"');
+      }
+      
+      const blob = new Blob([cleanSVG], { type: 'image/svg+xml' });
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      console.error(`Failed to create data URL for ${name}:`, error);
+      setError(true);
+      return null;
+    }
+  };
+
+  const svgUrl = createSVGDataUrl(svgContent);
+
+  useEffect(() => {
+    return () => {
+      if (svgUrl) {
+        URL.revokeObjectURL(svgUrl);
+      }
+    };
+  }, [svgUrl]);
+
+  if (error || !svgUrl) {
+    return (
+      <div className="flex flex-col items-center justify-center text-red-400 text-sm">
+        <div className="text-2xl mb-2">⚠️</div>
+        <div>Render error</div>
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src={svgUrl}
+      alt={name}
+      className="object-contain"
+      style={{ 
+        width: `${size}px`,
+        height: `${size}px`,
+        filter: 'brightness(0) saturate(100%) invert(17%) sepia(9%) saturate(1017%) hue-rotate(186deg) brightness(96%) contrast(90%)'
+      }}
+      onLoad={() => {
+        setIsLoaded(true);
+        console.log(`Icon ${name} loaded successfully`);
+      }}
+      onError={() => {
+        setError(true);
+        console.error(`Icon ${name} failed to load`);
+      }}
+    />
+  );
+};
 
 export const IconCard: React.FC<IconCardProps> = ({
   icon,
@@ -53,37 +133,15 @@ export const IconCard: React.FC<IconCardProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  const iconContainerStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
-    maxWidth: '80px',
-    maxHeight: '80px',
-    overflow: 'visible'
-  };
-
-  const previewContainerStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
-    maxWidth: '200px',
-    maxHeight: '200px',
-    overflow: 'visible'
-  };
-
   return (
     <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:shadow-md transition-shadow">
       {/* Icon Preview */}
       <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-4 border min-h-32 relative">
-        {icon.svgContent ? (
-          <div
-            className="flex items-center justify-center w-full h-full"
-            dangerouslySetInnerHTML={{ __html: icon.svgContent }}
-            style={iconContainerStyle}
-          />
-        ) : (
-          <div className="flex items-center justify-center w-full h-full text-slate-400 text-sm">
-            No preview available
-          </div>
-        )}
+        <SVGIcon 
+          svgContent={icon.svgContent} 
+          name={icon.name}
+          size={80}
+        />
       </div>
 
       {/* Icon Info */}
@@ -173,15 +231,11 @@ export const IconCard: React.FC<IconCardProps> = ({
             </div>
             
             <div className="bg-slate-50 rounded-lg p-8 mb-4 flex items-center justify-center min-h-48">
-              {icon.svgContent ? (
-                <div
-                  className="flex items-center justify-center"
-                  dangerouslySetInnerHTML={{ __html: icon.svgContent }}
-                  style={previewContainerStyle}
-                />
-              ) : (
-                <div className="text-slate-400">No preview available</div>
-              )}
+              <SVGIcon 
+                svgContent={icon.svgContent} 
+                name={icon.name}
+                size={200}
+              />
             </div>
             
             <div className="bg-slate-100 rounded p-3 text-sm font-mono overflow-auto max-h-40">
@@ -190,26 +244,6 @@ export const IconCard: React.FC<IconCardProps> = ({
           </div>
         </div>
       )}
-
-      <style>{`
-        .bg-slate-50 svg {
-          width: 100% !important;
-          height: 100% !important;
-          max-width: 80px !important;
-          max-height: 80px !important;
-          fill: #1f2937 !important;
-          stroke: #1f2937 !important;
-        }
-        
-        .fixed svg {
-          width: 100% !important;
-          height: 100% !important;
-          max-width: 200px !important;
-          max-height: 200px !important;
-          fill: #1f2937 !important;
-          stroke: #1f2937 !important;
-        }
-      `}</style>
     </div>
   );
 };
