@@ -1,0 +1,135 @@
+
+import React, { useState } from 'react';
+import { ExtractedIcon } from './SvgIconManager';
+import { IconMetadataForm } from './IconMetadataForm';
+import { Download, Eye } from 'lucide-react';
+
+interface IconCardProps {
+  icon: ExtractedIcon;
+  onSave: (icon: ExtractedIcon) => void;
+  showMetadataForm: boolean;
+}
+
+export const IconCard: React.FC<IconCardProps> = ({
+  icon,
+  onSave,
+  showMetadataForm,
+}) => {
+  const [showForm, setShowForm] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
+  const handleSave = (updatedIcon: ExtractedIcon) => {
+    onSave(updatedIcon);
+    setShowForm(false);
+  };
+
+  const downloadIcon = () => {
+    const blob = new Blob([icon.svgContent], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${icon.name}.svg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:shadow-md transition-shadow">
+      {/* Icon Preview */}
+      <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-4 border">
+        <div
+          className="max-w-full max-h-full"
+          dangerouslySetInnerHTML={{ __html: icon.svgContent }}
+        />
+      </div>
+
+      {/* Icon Info */}
+      <div className="space-y-2">
+        <h3 className="font-semibold text-slate-800 truncate">{icon.name}</h3>
+        <div className="flex justify-between text-sm text-slate-600">
+          <span>{icon.dimensions.width}×{icon.dimensions.height}</span>
+          <span>{(icon.fileSize / 1024).toFixed(1)}KB</span>
+        </div>
+        
+        {icon.category && (
+          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+            {icon.category}
+          </span>
+        )}
+
+        {icon.keywords.length > 0 && (
+          <p className="text-xs text-slate-500 truncate">
+            Tags: {icon.keywords.join(', ')}
+          </p>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2 mt-4">
+        {showMetadataForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          >
+            Add Metadata
+          </button>
+        )}
+        
+        <button
+          onClick={() => setShowPreview(true)}
+          className="p-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-colors"
+          title="Preview"
+        >
+          <Eye className="h-4 w-4" />
+        </button>
+        
+        <button
+          onClick={downloadIcon}
+          className="p-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-colors"
+          title="Download"
+        >
+          <Download className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Metadata Form Modal */}
+      {showForm && (
+        <IconMetadataForm
+          icon={icon}
+          onSave={handleSave}
+          onCancel={() => setShowForm(false)}
+        />
+      )}
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">{icon.name}</h3>
+              <button
+                onClick={() => setShowPreview(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="bg-slate-50 rounded-lg p-8 mb-4 flex items-center justify-center">
+              <div
+                className="w-32 h-32"
+                dangerouslySetInnerHTML={{ __html: icon.svgContent }}
+              />
+            </div>
+            
+            <div className="bg-slate-100 rounded p-3 text-sm font-mono overflow-auto max-h-40">
+              {icon.svgContent}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
