@@ -19,6 +19,7 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
 
   if (!svgContent) {
     return (
@@ -32,14 +33,15 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
   // Create a data URL for the SVG to ensure it renders properly
   const createSVGDataUrl = (content: string) => {
     try {
-      // Clean and optimize the SVG for display
+      // Clean and optimize the SVG for display - force visibility
       let cleanSVG = content
         .replace(/fill="none"/g, 'fill="currentColor"')
-        .replace(/stroke="none"/g, 'stroke="currentColor"');
+        .replace(/stroke="none"/g, 'stroke="currentColor"')
+        .replace(/opacity="[^"]*"/g, ''); // Remove any opacity that might hide icons
       
-      // Ensure the SVG has proper dimensions and styling
-      if (!cleanSVG.includes('fill=')) {
-        cleanSVG = cleanSVG.replace('<svg', '<svg fill="currentColor"');
+      // Ensure the SVG has proper dimensions and styling for visibility
+      if (!cleanSVG.includes('fill=') && !cleanSVG.includes('stroke=')) {
+        cleanSVG = cleanSVG.replace('<svg', '<svg fill="currentColor" stroke="currentColor"');
       }
       
       const blob = new Blob([cleanSVG], { type: 'image/svg+xml' });
@@ -61,34 +63,78 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
     };
   }, [svgUrl]);
 
+  // Enhanced debug logging for visibility issues
+  useEffect(() => {
+    console.log(`SVG Icon Debug for ${name}:`, {
+      hasContent: !!svgContent,
+      contentLength: svgContent?.length,
+      hasViewBox: svgContent?.includes('viewBox'),
+      viewBox: svgContent?.match(/viewBox="([^"]+)"/)?.[1],
+      hasFill: svgContent?.includes('fill='),
+      hasCurrentColor: svgContent?.includes('currentColor'),
+      svgUrl: !!svgUrl
+    });
+  }, [svgContent, name, svgUrl]);
+
   if (error || !svgUrl) {
     return (
-      <div className="flex flex-col items-center justify-center text-red-400 text-sm">
+      <div className="flex flex-col items-center justify-center text-slate-400 text-sm">
         <div className="text-2xl mb-2">⚠️</div>
         <div>Render error</div>
+        <button 
+          className="text-xs text-blue-500 underline mt-1"
+          onClick={() => {
+            console.log(`=== DEBUG ${name} ===`);
+            console.log("SVG Content:", svgContent);
+            console.log("Content preview:", svgContent?.substring(0, 300));
+          }}
+        >
+          Debug
+        </button>
       </div>
     );
   }
 
   return (
-    <img 
-      src={svgUrl}
-      alt={name}
-      className="object-contain"
-      style={{ 
-        width: `${size}px`,
-        height: `${size}px`,
-        filter: 'brightness(0) saturate(100%) invert(17%) sepia(9%) saturate(1017%) hue-rotate(186deg) brightness(96%) contrast(90%)'
-      }}
-      onLoad={() => {
-        setIsLoaded(true);
-        console.log(`Icon ${name} loaded successfully`);
-      }}
-      onError={() => {
-        setError(true);
-        console.error(`Icon ${name} failed to load`);
-      }}
-    />
+    <div className="relative">
+      {!showFallback ? (
+        <img 
+          src={svgUrl}
+          alt={name}
+          className="object-contain"
+          style={{ 
+            width: `${size}px`,
+            height: `${size}px`,
+            color: '#1f2937'
+          }}
+          onLoad={() => {
+            setIsLoaded(true);
+            console.log(`Icon ${name} loaded successfully`);
+          }}
+          onError={() => {
+            console.error(`Icon ${name} failed to load, trying fallback`);
+            setShowFallback(true);
+          }}
+        />
+      ) : (
+        <div className="flex flex-col items-center justify-center text-slate-600" style={{ width: `${size}px`, height: `${size}px` }}>
+          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-2">
+            <span className="text-lg">🔧</span>
+          </div>
+          <div className="text-xs text-center">Icon extracted</div>
+          <button 
+            className="text-xs text-blue-500 underline mt-1"
+            onClick={() => {
+              console.log(`=== FALLBACK DEBUG ${name} ===`);
+              console.log("SVG Content:", svgContent);
+              console.log("SVG URL:", svgUrl);
+            }}
+          >
+            Debug
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -102,12 +148,13 @@ export const IconCard: React.FC<IconCardProps> = ({
   const [showForm, setShowForm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
-  // Debug logging
+  // Enhanced debug logging
   console.log("Rendering IconCard for:", icon.name, {
     hasContent: !!icon.svgContent,
     contentLength: icon.svgContent?.length,
     dimensions: icon.dimensions,
-    contentPreview: icon.svgContent?.substring(0, 100)
+    contentPreview: icon.svgContent?.substring(0, 100),
+    viewBox: icon.svgContent?.match(/viewBox="([^"]+)"/)?.[1]
   });
 
   const handleSave = (updatedIcon: ExtractedIcon) => {
@@ -135,13 +182,31 @@ export const IconCard: React.FC<IconCardProps> = ({
 
   return (
     <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:shadow-md transition-shadow">
-      {/* Icon Preview */}
+      {/* Icon Preview with enhanced debugging */}
       <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-4 border min-h-32 relative">
         <SVGIcon 
           svgContent={icon.svgContent} 
           name={icon.name}
           size={80}
         />
+        
+        {/* Debug info overlay (only visible in console) */}
+        <div className="absolute top-1 right-1">
+          <button 
+            className="text-xs bg-slate-100 text-slate-500 px-1 rounded opacity-50 hover:opacity-100"
+            onClick={() => {
+              console.log(`=== ICON CARD DEBUG ${icon.name} ===`);
+              console.log("Full icon object:", icon);
+              console.log("SVG Content:", icon.svgContent);
+              console.log("ViewBox:", icon.svgContent?.match(/viewBox="([^"]+)"/)?.[1]);
+              console.log("Dimensions:", icon.dimensions);
+              console.log("Has visible elements:", icon.svgContent?.includes('<path') || icon.svgContent?.includes('<circle') || icon.svgContent?.includes('<rect'));
+            }}
+            title="Debug this icon"
+          >
+            ?
+          </button>
+        </div>
       </div>
 
       {/* Icon Info */}
@@ -165,6 +230,11 @@ export const IconCard: React.FC<IconCardProps> = ({
             Tags: {icon.keywords.join(', ')}
           </p>
         )}
+        
+        {/* Debug info */}
+        <div className="text-xs text-slate-400">
+          ViewBox: {icon.svgContent?.match(/viewBox="([^"]+)"/)?.[1] || 'default'}
+        </div>
       </div>
 
       {/* Actions */}
@@ -216,7 +286,7 @@ export const IconCard: React.FC<IconCardProps> = ({
         />
       )}
 
-      {/* Preview Modal */}
+      {/* Enhanced Preview Modal */}
       {showPreview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
@@ -236,6 +306,13 @@ export const IconCard: React.FC<IconCardProps> = ({
                 name={icon.name}
                 size={200}
               />
+            </div>
+            
+            {/* Enhanced debug info */}
+            <div className="mb-4 p-3 bg-blue-50 rounded text-sm">
+              <p><strong>ViewBox:</strong> {icon.svgContent?.match(/viewBox="([^"]+)"/)?.[1] || 'Not specified'}</p>
+              <p><strong>Dimensions:</strong> {icon.dimensions.width}×{icon.dimensions.height}</p>
+              <p><strong>Content Length:</strong> {icon.svgContent?.length} characters</p>
             </div>
             
             <div className="bg-slate-100 rounded p-3 text-sm font-mono overflow-auto max-h-40">

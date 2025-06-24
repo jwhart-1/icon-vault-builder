@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
@@ -22,6 +23,30 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     }
   }, [files]);
 
+  const calculateIconViewBox = (groupElement: Element) => {
+    try {
+      // Get the bounding box of all elements in this group
+      const bbox = (groupElement as any).getBBox();
+      
+      if (bbox && bbox.width > 0 && bbox.height > 0) {
+        // Add some padding around the icon
+        const padding = Math.max(bbox.width, bbox.height) * 0.1;
+        const x = Math.round(bbox.x - padding);
+        const y = Math.round(bbox.y - padding);
+        const width = Math.round(bbox.width + (padding * 2));
+        const height = Math.round(bbox.height + (padding * 2));
+        
+        console.log(`Calculated viewBox: ${x} ${y} ${width} ${height} for bbox:`, bbox);
+        return `${x} ${y} ${width} ${height}`;
+      }
+    } catch (error) {
+      console.warn("Could not calculate bbox:", error);
+    }
+    
+    // Fallback viewBox
+    return "0 0 24 24";
+  };
+
   const getElementDimensions = (element: Element) => {
     try {
       if ((element as any).getBBox) {
@@ -41,40 +66,48 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
   };
 
   const createIndividualIconSVG = (element: Element, originalSVG: Element): string => {
-    // Get viewBox from original SVG or use default
-    let viewBox = originalSVG.getAttribute('viewBox') || '0 0 24 24';
+    // Calculate the proper viewBox for this specific icon
+    const iconViewBox = calculateIconViewBox(element);
     
     // Clone the element to avoid modifying the original
     const clonedElement = element.cloneNode(true) as Element;
     
-    // Clean up any problematic attributes that might hide the icon
+    // Remove any transforms that might hide the icon
     clonedElement.removeAttribute('transform');
     
-    // Ensure the element has proper styling for visibility
-    const tagName = clonedElement.tagName.toLowerCase();
-    if (tagName === 'g') {
+    // Reset any problematic styles and ensure visibility
+    const allElements = clonedElement.querySelectorAll('*');
+    allElements.forEach((el: Element) => {
+      // Remove transforms that might hide elements
+      el.removeAttribute('transform');
+      
+      // Ensure visibility
+      if (el.getAttribute('fill') === 'none' || !el.getAttribute('fill')) {
+        el.setAttribute('fill', 'currentColor');
+      }
+      if (el.getAttribute('stroke') === 'none' && !el.getAttribute('fill')) {
+        el.setAttribute('stroke', 'currentColor');
+      }
+      // Remove any opacity that might hide the element
+      el.removeAttribute('opacity');
+    });
+    
+    // Ensure the main element has proper styling
+    if (clonedElement.tagName.toLowerCase() === 'g') {
       clonedElement.setAttribute('fill', 'currentColor');
       clonedElement.setAttribute('stroke', 'currentColor');
-    } else if (tagName === 'path') {
+    } else if (clonedElement.tagName.toLowerCase() === 'path') {
       if (!clonedElement.getAttribute('fill') || clonedElement.getAttribute('fill') === 'none') {
         clonedElement.setAttribute('fill', 'currentColor');
       }
     }
     
-    // Get all child elements and ensure they're visible
-    const childPaths = clonedElement.querySelectorAll('path');
-    childPaths.forEach(path => {
-      if (!path.getAttribute('fill') || path.getAttribute('fill') === 'none') {
-        path.setAttribute('fill', 'currentColor');
-      }
-    });
-    
-    // Create a clean, visible SVG with explicit styling
-    const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="64" height="64" fill="currentColor" stroke="currentColor" stroke-width="0.5">
+    // Create SVG with calculated viewBox and explicit styling
+    const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${iconViewBox}" width="64" height="64" fill="currentColor" stroke="currentColor" stroke-width="0.5">
 ${clonedElement.outerHTML}
 </svg>`;
     
-    console.log(`Created visible SVG (${iconSVG.length} chars):`, iconSVG.substring(0, 200));
+    console.log(`Created icon SVG with viewBox ${iconViewBox}:`, iconSVG.substring(0, 200));
     return iconSVG;
   };
 
@@ -293,7 +326,7 @@ ${clonedElement.outerHTML}
     
     console.log(`=== EXTRACTION COMPLETE: ${extractedIcons.length} icons ===`);
     
-    // Debug the extracted icons
+    // Debug the first few extracted icons with enhanced logging
     console.log("=== SVG DEBUG INFO ===");
     extractedIcons.slice(0, 3).forEach((icon, index) => {
       console.log(`Icon ${index} (${icon.name}):`);
@@ -301,7 +334,8 @@ ${clonedElement.outerHTML}
       console.log("Content length:", icon.svgContent?.length);
       console.log("Has <svg> tag:", icon.svgContent?.includes('<svg'));
       console.log("Has paths:", icon.svgContent?.includes('<path'));
-      console.log("Has currentColor:", icon.svgContent?.includes('currentColor'));
+      console.log("Has currentColor:", icon.svgContent?.includes('currentColor'));  
+      console.log("ViewBox:", icon.svgContent?.match(/viewBox="([^"]+)"/)?.[1]);
       console.log("---");
     });
     
