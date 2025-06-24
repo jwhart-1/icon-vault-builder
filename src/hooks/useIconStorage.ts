@@ -93,18 +93,29 @@ export const useIconStorage = () => {
         return [];
       }
 
-      return (data || []).map((record: IconRecord) => ({
-        id: record.id,
-        svgContent: record.svg_content,
-        name: record.name,
-        category: record.category || '',
-        description: record.description || '',
-        keywords: record.keywords || [],
-        license: record.license || '',
-        author: record.author || '',
-        dimensions: record.dimensions || { width: 24, height: 24 },
-        fileSize: record.file_size || 0,
-      }));
+      return (data || []).map((record) => {
+        // Safely parse dimensions from Json type
+        let dimensions = { width: 24, height: 24 };
+        if (record.dimensions && typeof record.dimensions === 'object' && record.dimensions !== null) {
+          const dims = record.dimensions as any;
+          if (typeof dims.width === 'number' && typeof dims.height === 'number') {
+            dimensions = { width: dims.width, height: dims.height };
+          }
+        }
+
+        return {
+          id: record.id,
+          svgContent: record.svg_content,
+          name: record.name,
+          category: record.category || '',
+          description: record.description || '',
+          keywords: record.keywords || [],
+          license: record.license || '',
+          author: record.author || '',
+          dimensions,
+          fileSize: record.file_size || 0,
+        };
+      });
     } catch (error) {
       console.error('Error loading icons:', error);
       toast({
