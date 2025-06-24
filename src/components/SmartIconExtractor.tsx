@@ -1,7 +1,7 @@
+
 import React, { useEffect, useState } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
-import { SvgAnalyzer } from './SvgAnalyzer';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface SmartIconExtractorProps {
   files: File[];
@@ -23,209 +23,266 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     }
   }, [files]);
 
-  const createStandaloneIcon = (element: Element, originalViewBox: string = '0 0 24 24', originalSvg?: Element): string => {
-    const serializer = new XMLSerializer();
-    let innerContent = '';
-    
-    // Get original styles and defs from the parent SVG
-    let styleContent = '';
-    let defsContent = '';
-    
-    if (originalSvg) {
-      const styleEl = originalSvg.querySelector('style');
-      if (styleEl) {
-        styleContent = `<style><![CDATA[${styleEl.innerHTML}]]></style>`;
+  const getElementDimensions = (element: Element) => {
+    try {
+      if ((element as any).getBBox) {
+        const bbox = (element as any).getBBox();
+        return {
+          width: Math.round(bbox.width),
+          height: Math.round(bbox.height),
+          x: Math.round(bbox.x),
+          y: Math.round(bbox.y)
+        };
       }
+    } catch (e) {
+      console.warn("Could not get element dimensions:", e);
+    }
+    
+    return { width: 24, height: 24, x: 0, y: 0 };
+  };
+
+  const createIndividualIconSVG = (element: Element, originalSVG: Element): string => {
+    // Get the original viewBox or create one
+    const originalViewBox = originalSVG.getAttribute('viewBox') || '0 0 24 24';
+    
+    // Get any relevant attributes from the original SVG
+    const xmlns = originalSVG.getAttribute('xmlns') || 'http://www.w3.org/2000/svg';
+    
+    // Get styles from original SVG if any
+    const styleElement = originalSVG.querySelector('style');
+    const styleContent = styleElement ? `<style>${styleElement.innerHTML}</style>` : '';
+    
+    // Get defs from original SVG if any
+    const defsElement = originalSVG.querySelector('defs');
+    const defsContent = defsElement ? defsElement.outerHTML : '';
+    
+    // Create a standalone SVG for this icon
+    const iconSVG = `<svg xmlns="${xmlns}" viewBox="${originalViewBox}" width="24" height="24" fill="currentColor" stroke="currentColor">
+  ${defsContent}
+  ${styleContent}
+  ${element.outerHTML}
+</svg>`;
+    
+    return iconSVG;
+  };
+
+  const detectGridIcons = (svgElement: Element, fileName: string): ExtractedIcon[] => {
+    console.log("=== GRID DETECTION MODE ===");
+    
+    // Get all potential icon elements
+    const allElements = Array.from(svgElement.querySelectorAll('g, path, circle, rect, polygon'));
+    console.log(`Analyzing ${allElements.length} elements for grid patterns`);
+    
+    const elementsWithPositions: Array<{
+      element: Element;
+      index: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }> = [];
+    
+    allElements.forEach((element, index) => {
+      try {
+        const bbox = (element as any).getBBox ? (element as any).getBBox() : null;
+        if (bbox && bbox.width > 0 && bbox.height > 0) {
+          elementsWithPositions.push({
+            element,
+            index,
+            x: Math.round(bbox.x),
+            y: Math.round(bbox.y),
+            width: Math.round(bbox.width),
+            height: Math.round(bbox.height)
+          });
+        }
+      } catch (e) {
+        // Skip elements that can't provide bbox
+      }
+    });
+    
+    console.log(`Found ${elementsWithPositions.length} positioned elements`);
+    
+    // Group by Y position (rows) with tolerance
+    const tolerance = 20;
+    const rows: { [key: number]: typeof elementsWithPositions } = {};
+    
+    elementsWithPositions.forEach(item => {
+      const rowKey = Math.round(item.y / tolerance) * tolerance;
+      if (!rows[rowKey]) rows[rowKey] = [];
+      rows[rowKey].push(item);
+    });
+    
+    console.log(`Detected ${Object.keys(rows).length} potential rows`);
+    
+    const gridIcons: ExtractedIcon[] = [];
+    
+    // Process each row
+    Object.entries(rows).forEach(([rowY, rowItems]) => {
+      // Sort by X position
+      rowItems.sort((a, b) => a.x - b.x);
       
-      const defsEl = originalSvg.querySelector('defs');
-      if (defsEl) {
-        defsContent = serializer.serializeToString(defsEl);
-      }
-    }
-    
-    // Serialize the element content
-    if (element.tagName.toLowerCase() === 'g') {
-      // For groups, serialize all children
-      Array.from(element.children).forEach(child => {
-        innerContent += serializer.serializeToString(child);
+      rowItems.slice(0, 20).forEach((item, colIndex) => { // Limit to 20 per row
+        const iconSVG = createIndividualIconSVG(item.element, svgElement);
+        
+        gridIcons.push({
+          id: `grid-icon-${Date.now()}-${rowY}-${colIndex}`,
+          svgContent: iconSVG,
+          name: `${fileName.replace('.svg', '')} Grid ${Math.round(Number(rowY)/tolerance)}-${colIndex}`,
+          category: 'Grid-detected',
+          description: `Extracted from ${fileName}`,
+          keywords: ['grid', 'detected'],
+          license: '',
+          author: '',
+          dimensions: { width: item.width, height: item.height },
+          fileSize: new Blob([iconSVG]).size,
+        });
       });
-    } else {
-      // For other elements, serialize the element itself
-      innerContent = serializer.serializeToString(element);
-    }
+    });
     
-    // Always use a standard 24x24 viewBox for consistency and visibility
-    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-      ${defsContent}
-      ${styleContent}
-      ${innerContent}
-    </svg>`;
-    
-    console.log('Created standalone icon, content length:', svgContent.length);
-    
-    return svgContent;
+    console.log(`Grid detection found ${gridIcons.length} icons`);
+    return gridIcons.slice(0, 50); // Limit total grid icons
   };
 
-  const isValidIconElement = (element: Element): boolean => {
-    // Very permissive validation - just check if element has some visual content
-    if (!element) return false;
+  const extractIconsFromSVG = async (svgContent: string, fileName: string): Promise<ExtractedIcon[]> => {
+    console.log("=== EXTRACTING ICONS FROM SVG ===");
+    console.log("File name:", fileName);
+    console.log("SVG content length:", svgContent.length);
+    console.log("First 200 chars:", svgContent.substring(0, 200));
     
-    // Check for basic SVG drawing elements
-    const hasDrawingElements = element.querySelector('path, circle, rect, polygon, line, polyline, ellipse, use, text, image') || 
-                              element.tagName.toLowerCase() === 'path' ||
-                              element.tagName.toLowerCase() === 'circle' ||
-                              element.tagName.toLowerCase() === 'rect';
-    
-    return !!hasDrawingElements;
-  };
-
-  const extractIconsFromSVG = (svgContent: string, fileName: string): ExtractedIcon[] => {
-    console.log(`\n=== PROCESSING: ${fileName} ===`);
-    console.log('SVG content length:', svgContent.length);
-    setCurrentStrategy(`Analyzing ${fileName}...`);
-    
+    // Parse the SVG content
     const parser = new DOMParser();
-    const doc = parser.parseFromString(svgContent, 'image/svg+xml');
-    const icons: ExtractedIcon[] = [];
-
-    const parserError = doc.querySelector('parsererror');
-    if (parserError) {
-      console.error('SVG parsing error:', parserError.textContent);
-      return icons;
-    }
-
-    const svgElement = doc.querySelector('svg');
-    if (!svgElement) {
-      console.error('No root SVG element found');
-      return icons;
-    }
-
-    // Use standard viewBox for better visibility
-    const viewBox = '0 0 24 24';
-    console.log('Using standard viewBox:', viewBox);
+    const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
     
-    // Strategy 1: Extract symbols (highest priority)
+    // Check for parsing errors
+    const parseError = svgDoc.querySelector('parsererror');
+    if (parseError) {
+      throw new Error('Invalid SVG file format');
+    }
+    
+    const svgElement = svgDoc.documentElement;
+    console.log("SVG root element:", svgElement.tagName);
+    console.log("SVG viewBox:", svgElement.getAttribute('viewBox'));
+    console.log("SVG width:", svgElement.getAttribute('width'));
+    console.log("SVG height:", svgElement.getAttribute('height'));
+    
+    const extractedIcons: ExtractedIcon[] = [];
+    
+    // STRATEGY 1: Look for <symbol> elements first (highest priority)
     setCurrentStrategy('Extracting symbol definitions...');
     const symbols = Array.from(svgElement.querySelectorAll('symbol'));
     console.log(`Found ${symbols.length} symbols`);
     
     symbols.forEach((symbol, index) => {
-      if (isValidIconElement(symbol)) {
-        const iconId = symbol.getAttribute('id') || `symbol-${index}`;
-        const svgWrapper = createStandaloneIcon(symbol, viewBox, svgElement);
+      const paths = symbol.querySelectorAll('path');
+      const circles = symbol.querySelectorAll('circle');
+      const rects = symbol.querySelectorAll('rect');
+      const polygons = symbol.querySelectorAll('polygon');
+      const lines = symbol.querySelectorAll('line');
+      
+      const totalElements = paths.length + circles.length + rects.length + polygons.length + lines.length;
+      
+      if (totalElements > 0) {
+        const iconSVG = createIndividualIconSVG(symbol, svgElement);
+        const symbolId = symbol.getAttribute('id') || `symbol-${index}`;
         
-        console.log(`Creating symbol icon: ${iconId}`);
-        
-        icons.push({
-          id: `${fileName}-symbol-${iconId}-${Date.now()}-${index}`,
-          svgContent: svgWrapper,
-          name: iconId.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        extractedIcons.push({
+          id: `${fileName}-symbol-${symbolId}-${Date.now()}-${index}`,
+          svgContent: iconSVG,
+          name: symbolId.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
           category: 'Symbol',
           description: `Extracted from ${fileName}`,
-          keywords: [iconId, 'symbol'],
+          keywords: [symbolId, 'symbol'],
           license: '',
           author: '',
           dimensions: { width: 24, height: 24 },
-          fileSize: new Blob([svgWrapper]).size,
+          fileSize: new Blob([iconSVG]).size,
         });
+        
+        console.log(`✓ Extracted symbol: ${symbolId} with ${totalElements} elements`);
       }
     });
 
-    // Strategy 2: Extract groups with IDs 
-    setCurrentStrategy('Extracting named groups...');
-    const namedGroups = Array.from(svgElement.querySelectorAll('g[id]'));
-    console.log(`Found ${namedGroups.length} named groups`);
-    
-    namedGroups.forEach((group, index) => {
-      if (isValidIconElement(group)) {
-        const groupId = group.getAttribute('id') || `group-${index}`;
-        const svgWrapper = createStandaloneIcon(group, viewBox, svgElement);
-        
-        console.log(`Creating group icon: ${groupId} (children: ${group.children.length})`);
-        
-        icons.push({
-          id: `${fileName}-group-${groupId}-${Date.now()}-${index}`,
-          svgContent: svgWrapper,
-          name: groupId.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          category: 'Group',
-          description: `Extracted from ${fileName}`,
-          keywords: [groupId, 'group'],
-          license: '',
-          author: '',
-          dimensions: { width: 24, height: 24 },
-          fileSize: new Blob([svgWrapper]).size,
-        });
-        console.log(`Successfully extracted named group: ${groupId}`);
-      }
-    });
-
-    // Strategy 3: Extract ALL groups (very permissive)
-    setCurrentStrategy('Extracting all content groups...');
-    const allGroups = Array.from(svgElement.querySelectorAll('g')).slice(0, 100);
-    console.log(`Found ${allGroups.length} total groups`);
-    
-    let validGroupCount = 0;
-    allGroups.forEach((group, index) => {
-      const groupId = group.getAttribute('id');
-      const alreadyProcessed = groupId && icons.some(icon => icon.name.toLowerCase().includes(groupId.toLowerCase()));
+    // STRATEGY 2: Look for <g> groups (most common for icon sets)
+    if (extractedIcons.length < 5) {
+      setCurrentStrategy('Extracting group elements...');
+      const allGroups = Array.from(svgElement.querySelectorAll('g'));
+      console.log(`Found ${allGroups.length} total groups`);
       
-      if (!alreadyProcessed && validGroupCount < 50 && isValidIconElement(group)) {
-        const displayId = groupId || group.getAttribute('class') || `icon-${validGroupCount + 1}`;
-        const svgWrapper = createStandaloneIcon(group, viewBox, svgElement);
+      allGroups.slice(0, 50).forEach((group, index) => {
+        // Check what's inside this group
+        const paths = group.querySelectorAll('path');
+        const circles = group.querySelectorAll('circle');
+        const rects = group.querySelectorAll('rect');
+        const polygons = group.querySelectorAll('polygon');
+        const lines = group.querySelectorAll('line');
         
-        console.log(`Creating auto group icon ${validGroupCount + 1}: ${displayId} (children: ${group.children.length})`);
+        const totalElements = paths.length + circles.length + rects.length + polygons.length + lines.length;
         
-        icons.push({
-          id: `${fileName}-auto-${validGroupCount}-${Date.now()}`,
-          svgContent: svgWrapper,
-          name: groupId ? groupId.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : `Icon ${validGroupCount + 1}`,
-          category: 'Auto-extracted',
-          description: `Extracted from ${fileName}`,
-          keywords: ['auto', 'extracted'],
-          license: '',
-          author: '',
-          dimensions: { width: 24, height: 24 },
-          fileSize: new Blob([svgWrapper]).size,
-        });
-        console.log(`Successfully extracted group ${validGroupCount + 1}`);
-        validGroupCount++;
-      }
-    });
-
-    // Strategy 4: Extract individual paths and shapes (fallback)
-    if (icons.length < 10) {
-      setCurrentStrategy('Extracting individual shapes...');
-      const shapes = Array.from(svgElement.querySelectorAll('path, circle, rect, polygon, ellipse')).slice(0, 30);
-      console.log(`Found ${shapes.length} individual shapes as fallback`);
-      
-      shapes.forEach((shape, index) => {
-        if (isValidIconElement(shape)) {
-          const svgWrapper = createStandaloneIcon(shape, viewBox, svgElement);
+        console.log(`Group ${index}: ${totalElements} drawing elements`);
+        
+        // If this group has drawing elements, it's likely an individual icon
+        if (totalElements > 0 && totalElements < 50) { // Reasonable complexity for a single icon
+          const iconSVG = createIndividualIconSVG(group, svgElement);
+          const groupId = group.getAttribute('id') || group.getAttribute('class') || `group-${index}`;
           
-          console.log(`Creating shape icon ${index + 1}`);
-          
-          icons.push({
-            id: `${fileName}-shape-${index}-${Date.now()}`,
-            svgContent: svgWrapper,
-            name: `${shape.tagName} Icon ${index + 1}`,
-            category: 'Shape',
+          extractedIcons.push({
+            id: `${fileName}-group-${groupId}-${Date.now()}-${index}`,
+            svgContent: iconSVG,
+            name: groupId !== `group-${index}` ? 
+                  groupId.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 
+                  `${fileName.replace('.svg', '')} Icon ${index + 1}`,
+            category: 'Group',
             description: `Extracted from ${fileName}`,
-            keywords: ['shape', 'extracted'],
+            keywords: [groupId, 'group'],
             license: '',
             author: '',
-            dimensions: { width: 24, height: 24 },
-            fileSize: new Blob([svgWrapper]).size,
+            dimensions: getElementDimensions(group),
+            fileSize: new Blob([iconSVG]).size,
           });
+          
+          console.log(`✓ Extracted icon ${index + 1} with ${totalElements} elements`);
         }
       });
     }
-
-    const finalIcons = icons.slice(0, 50);
     
-    console.log(`Successfully extracted ${finalIcons.length} icons from ${fileName}`);
-    setExtractionStats(prev => [...prev, `${fileName}: ${finalIcons.length} icons extracted`]);
+    // STRATEGY 3: If no groups found, look for direct child elements
+    if (extractedIcons.length === 0) {
+      setCurrentStrategy('Extracting direct elements...');
+      console.log("No groups found, trying direct child elements...");
+      
+      const directPaths = Array.from(svgElement.querySelectorAll('svg > path'));
+      const directShapes = Array.from(svgElement.querySelectorAll('svg > circle, svg > rect, svg > polygon'));
+      
+      console.log(`Found ${directPaths.length} direct paths, ${directShapes.length} direct shapes`);
+      
+      [...directPaths, ...directShapes].slice(0, 30).forEach((element, index) => {
+        const iconSVG = createIndividualIconSVG(element, svgElement);
+        
+        extractedIcons.push({
+          id: `${fileName}-direct-${Date.now()}-${index}`,
+          svgContent: iconSVG,
+          name: `${fileName.replace('.svg', '')} Element ${index + 1}`,
+          category: 'Direct Element',
+          description: `Extracted from ${fileName}`,
+          keywords: ['direct', 'element'],
+          license: '',
+          author: '',
+          dimensions: getElementDimensions(element),
+          fileSize: new Blob([iconSVG]).size,
+        });
+      });
+    }
     
-    return finalIcons;
+    // STRATEGY 4: Grid detection for icon sheets
+    if (extractedIcons.length < 5) {
+      setCurrentStrategy('Detecting grid patterns...');
+      console.log("Few icons found, attempting grid detection...");
+      const gridIcons = detectGridIcons(svgElement, fileName);
+      extractedIcons.push(...gridIcons);
+    }
+    
+    console.log(`=== EXTRACTION COMPLETE: ${extractedIcons.length} icons ===`);
+    return extractedIcons;
   };
 
   const processFiles = async () => {
@@ -236,31 +293,40 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      console.log(`\nProcessing file ${i + 1}/${files.length}: ${file.name}`);
+      console.log(`\n=== STARTING SVG PROCESSING ===`);
+      console.log(`Processing file ${i + 1}/${files.length}: ${file.name}`);
+      console.log("File size:", file.size);
       
       try {
-        if (file.size > 10000000) {
+        if (file.size > 10000000) { // 10MB limit
           console.error(`File ${file.name} too large, skipping`);
           setExtractionStats(prev => [...prev, `${file.name}: File too large (>10MB)`]);
           continue;
         }
         
-        const content = await file.text();
-        console.log(`File content loaded, length: ${content.length}`);
+        // Read the SVG content as text (NOT as data URL)
+        const svgText = await file.text();
+        console.log("SVG content length:", svgText.length);
+        console.log("First 200 chars:", svgText.substring(0, 200));
         
-        const extractedIcons = extractIconsFromSVG(content, file.name);
+        // Extract individual icons from the SVG content
+        const extractedIcons = await extractIconsFromSVG(svgText, file.name);
+        
+        console.log(`SUCCESS: Extracted ${extractedIcons.length} icons from ${file.name}`);
         allIcons.push(...extractedIcons);
         setProcessedFiles(i + 1);
+        
+        setExtractionStats(prev => [...prev, `${file.name}: ${extractedIcons.length} icons extracted`]);
         
         // Small delay to show progress
         await new Promise(resolve => setTimeout(resolve, 300));
       } catch (error) {
         console.error(`Error processing file ${file.name}:`, error);
-        setExtractionStats(prev => [...prev, `${file.name}: Processing error`]);
+        setExtractionStats(prev => [...prev, `${file.name}: Processing error - ${error}`]);
       }
     }
 
-    console.log(`\n=== EXTRACTION COMPLETE ===`);
+    console.log(`\n=== ALL FILES PROCESSED ===`);
     console.log(`Total icons extracted: ${allIcons.length}`);
     setIsProcessing(false);
     setCurrentStrategy('');
@@ -296,7 +362,7 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
         {extractionStats.length > 0 && (
           <div className="bg-slate-50 rounded-lg p-4">
             <h4 className="font-medium text-slate-700 mb-2 flex items-center">
-              <AlertCircle className="h-4 w-4 mr-2" />
+              <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
               Extraction Results
             </h4>
             <div className="space-y-1">
