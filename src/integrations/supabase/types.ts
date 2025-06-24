@@ -9,7 +9,72 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      icons: {
+        Row: {
+          author: string | null
+          category: string | null
+          created_at: string | null
+          description: string | null
+          dimensions: Json | null
+          file_size: number | null
+          id: string
+          keywords: string[] | null
+          license: string | null
+          name: string
+          svg_content: string
+          updated_at: string | null
+        }
+        Insert: {
+          author?: string | null
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          dimensions?: Json | null
+          file_size?: number | null
+          id?: string
+          keywords?: string[] | null
+          license?: string | null
+          name: string
+          svg_content: string
+          updated_at?: string | null
+        }
+        Update: {
+          author?: string | null
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          dimensions?: Json | null
+          file_size?: number | null
+          id?: string
+          keywords?: string[] | null
+          license?: string | null
+          name?: string
+          svg_content?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
