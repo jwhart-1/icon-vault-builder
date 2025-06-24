@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
 import { Download, Eye, Trash2 } from 'lucide-react';
@@ -32,11 +31,25 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
   }
 
   try {
-    // Extract all path elements from the SVG content
+    // Extract all drawing elements (not just paths)
     const pathMatches = svgContent.match(/<path[^>]*>/g) || [];
+    const circleMatches = svgContent.match(/<circle[^>]*>/g) || [];
+    const rectMatches = svgContent.match(/<rect[^>]*>/g) || [];
+    const lineMatches = svgContent.match(/<line[^>]*>/g) || [];
+    const ellipseMatches = svgContent.match(/<ellipse[^>]*>/g) || [];
+    const polygonMatches = svgContent.match(/<polygon[^>]*>/g) || [];
     
-    if (pathMatches.length === 0) {
-      // Fallback to colored square if no paths found
+    const allElements = [
+      ...pathMatches,
+      ...circleMatches,
+      ...rectMatches,
+      ...lineMatches,
+      ...ellipseMatches,
+      ...polygonMatches
+    ];
+
+    if (allElements.length === 0) {
+      // Fallback to colored square if no drawing elements found
       return (
         <div 
           className="flex items-center justify-center text-white font-bold rounded-lg"
@@ -51,20 +64,51 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
       );
     }
 
-    // Create a clean SVG with just the paths
-    const cleanPaths = pathMatches
-      .map(path => path.replace(/fill="[^"]*"/g, 'fill="currentColor"'))
-      .map(path => path.replace(/stroke="[^"]*"/g, 'stroke="currentColor"'))
-      .join('');
+    // Process each element to ensure visibility
+    const cleanElements = allElements.map(element => {
+      let cleanElement = element;
+      
+      // Handle stroke-based icons (line icons)
+      if (!element.includes('fill=') && !element.includes('stroke=')) {
+        // Add black stroke for line icons
+        cleanElement = element.replace('>', ' fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">');
+      } else {
+        // Replace currentColor and none values
+        cleanElement = cleanElement
+          .replace(/fill="currentColor"/g, 'fill="#000000"')
+          .replace(/stroke="currentColor"/g, 'stroke="#000000"')
+          .replace(/fill="none"/g, 'fill="none"')
+          .replace(/stroke="none"/g, 'stroke="#000000"');
+        
+        // If it has fill="none", ensure it has a stroke
+        if (cleanElement.includes('fill="none"') && !cleanElement.includes('stroke=')) {
+          cleanElement = cleanElement.replace('>', ' stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">');
+        }
+        
+        // If it has stroke but no width, add width
+        if (cleanElement.includes('stroke=') && !cleanElement.includes('stroke-width=')) {
+          cleanElement = cleanElement.replace('>', ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">');
+        }
+      }
+      
+      return cleanElement;
+    }).join('');
+
+    // Get the original viewBox from the source SVG
+    const viewBoxMatch = svgContent.match(/viewBox="([^"]*)"/);
+    const originalViewBox = viewBoxMatch ? viewBoxMatch[1] : '0 0 100 100';
 
     const cleanSvg = `
       <svg xmlns="http://www.w3.org/2000/svg" 
            width="${size}" 
            height="${size}" 
-           viewBox="0 0 100 100" 
-           fill="currentColor"
-           style="color: #000000;">
-        ${cleanPaths}
+           viewBox="${originalViewBox}" 
+           fill="none"
+           stroke="#000000"
+           stroke-width="2"
+           stroke-linecap="round"
+           stroke-linejoin="round">
+        ${cleanElements}
       </svg>
     `;
 
