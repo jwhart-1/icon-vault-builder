@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
-import { AdvancedIconExtractor } from './AdvancedIconExtractor';
+import { SmartIconExtractor } from './SmartIconExtractor';
 import { IconGrid } from './IconGrid';
 import { SearchAndFilter } from './SearchAndFilter';
 import { useIconStorage } from '@/hooks/useIconStorage';
@@ -44,7 +44,7 @@ export const SvgIconManager = () => {
     setCurrentStep('extract');
     toast({
       title: 'Files uploaded successfully',
-      description: `${files.length} SVG file(s) ready for processing`,
+      description: `${files.length} SVG file(s) ready for intelligent processing`,
     });
   };
 
@@ -52,8 +52,8 @@ export const SvgIconManager = () => {
     setExtractedIcons(icons);
     setCurrentStep('manage');
     toast({
-      title: 'Icons extracted',
-      description: `${icons.length} icon(s) found and ready for metadata entry`,
+      title: 'Icons extracted successfully',
+      description: `Found ${icons.length} individual icon(s) ready for metadata entry`,
     });
   };
 
@@ -90,39 +90,52 @@ export const SvgIconManager = () => {
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'upload' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>
               1
             </div>
-            <span>Upload</span>
+            <span>Upload SVG Files</span>
           </div>
           <div className="w-8 h-px bg-slate-300"></div>
           <div className={`flex items-center space-x-2 ${currentStep === 'extract' ? 'text-blue-600' : 'text-slate-400'}`}>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'extract' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>
               2
             </div>
-            <span>Extract</span>
+            <span>Extract Icons</span>
           </div>
           <div className="w-8 h-px bg-slate-300"></div>
           <div className={`flex items-center space-x-2 ${currentStep === 'manage' ? 'text-blue-600' : 'text-slate-400'}`}>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'manage' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>
               3
             </div>
-            <span>Manage</span>
+            <span>Manage Library</span>
           </div>
         </div>
       </div>
 
       {/* Content based on current step */}
       {currentStep === 'upload' && (
-        <FileUpload onFilesUploaded={handleFilesUploaded} />
+        <div>
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">Upload SVG Files</h2>
+            <p className="text-slate-600">
+              Upload SVG files containing multiple icons. Our smart extractor will identify and separate individual icons for you.
+            </p>
+          </div>
+          <FileUpload onFilesUploaded={handleFilesUploaded} />
+        </div>
       )}
 
       {currentStep === 'extract' && (
-        <AdvancedIconExtractor files={uploadedFiles} onIconsExtracted={handleIconsExtracted} />
+        <SmartIconExtractor files={uploadedFiles} onIconsExtracted={handleIconsExtracted} />
       )}
 
       {currentStep === 'manage' && (
         <div className="space-y-6">
           {extractedIcons.length > 0 && (
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-4">New Icons - Add Metadata</h2>
+              <h2 className="text-xl font-semibold mb-4">
+                Extracted Icons ({extractedIcons.length}) - Add Metadata
+              </h2>
+              <p className="text-slate-600 mb-4">
+                Review and add metadata to each extracted icon before saving to your library.
+              </p>
               <IconGrid 
                 icons={extractedIcons} 
                 onIconSaved={handleIconSaved}
