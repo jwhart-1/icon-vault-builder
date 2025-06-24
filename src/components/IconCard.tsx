@@ -15,49 +15,42 @@ interface IconCardProps {
 const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = ({ 
   svgContent, 
   name, 
-  size = 80 
+  size = 100 
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
   const [viewBoxInfo, setViewBoxInfo] = useState('');
+  const [svgUrl, setSvgUrl] = useState<string | null>(null);
 
-  if (!svgContent) {
-    return (
-      <div className="flex flex-col items-center justify-center text-slate-400 text-sm">
-        <div className="text-2xl mb-2">🔧</div>
-        <div>No icon content</div>
-      </div>
-    );
-  }
+  // Move SVG URL creation to useEffect to prevent infinite renders
+  useEffect(() => {
+    if (!svgContent) {
+      setError(true);
+      return;
+    }
 
-  // Create a data URL for the SVG to ensure it renders properly
-  const createSVGDataUrl = (content: string) => {
     try {
       // Extract viewBox info for debugging
-      const viewBoxMatch = content.match(/viewBox="([^"]+)"/);
+      const viewBoxMatch = svgContent.match(/viewBox="([^"]+)"/);
       if (viewBoxMatch) {
         setViewBoxInfo(viewBoxMatch[1]);
       }
       
-      const blob = new Blob([content], { type: 'image/svg+xml' });
-      return URL.createObjectURL(blob);
+      const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      setSvgUrl(url);
+
+      return () => {
+        if (url) {
+          URL.revokeObjectURL(url);
+        }
+      };
     } catch (error) {
       console.error(`Failed to create data URL for ${name}:`, error);
       setError(true);
-      return null;
     }
-  };
-
-  const svgUrl = createSVGDataUrl(svgContent);
-
-  useEffect(() => {
-    return () => {
-      if (svgUrl) {
-        URL.revokeObjectURL(svgUrl);
-      }
-    };
-  }, [svgUrl]);
+  }, [svgContent, name]);
 
   // Enhanced debug logging for complete icons
   useEffect(() => {
@@ -71,6 +64,15 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
       svgUrl: !!svgUrl
     });
   }, [svgContent, name, svgUrl, viewBoxInfo]);
+
+  if (!svgContent) {
+    return (
+      <div className="flex flex-col items-center justify-center text-slate-400 text-sm">
+        <div className="text-2xl mb-2">🔧</div>
+        <div>No icon content</div>
+      </div>
+    );
+  }
 
   if (error || !svgUrl) {
     return (
@@ -182,11 +184,11 @@ export const IconCard: React.FC<IconCardProps> = ({
   return (
     <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:shadow-md transition-shadow">
       {/* Larger Icon Preview for complete icons */}
-      <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-6 border" style={{ minHeight: '140px' }}>
+      <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-8 border" style={{ minHeight: '160px' }}>
         <SVGIcon 
           svgContent={icon.svgContent} 
           name={icon.name}
-          size={100}
+          size={120}
         />
         
         {/* Debug info overlay */}
