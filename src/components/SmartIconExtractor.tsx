@@ -23,27 +23,46 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     }
   }, [files]);
 
-  const createStandaloneIcon = (element: Element, originalViewBox: string = '0 0 24 24'): string => {
+  const createStandaloneIcon = (element: Element, originalViewBox: string = '0 0 24 24', originalSvg?: Element): string => {
     const serializer = new XMLSerializer();
     let innerContent = '';
     
-    // If it's a group, get all its children
+    // Get original styles and defs from the parent SVG
+    let styleContent = '';
+    let defsContent = '';
+    
+    if (originalSvg) {
+      const styleEl = originalSvg.querySelector('style');
+      if (styleEl) {
+        styleContent = `<style>${styleEl.innerHTML}</style>`;
+      }
+      
+      const defsEl = originalSvg.querySelector('defs');
+      if (defsEl) {
+        defsContent = serializer.serializeToString(defsEl);
+      }
+    }
+    
+    // Serialize the element content
     if (element.tagName.toLowerCase() === 'g') {
-      // Serialize all children of the group
+      // For groups, serialize all children
       Array.from(element.children).forEach(child => {
         innerContent += serializer.serializeToString(child);
       });
     } else {
-      // For non-group elements, serialize the element itself
+      // For other elements, serialize the element itself
       innerContent = serializer.serializeToString(element);
     }
     
-    // Use the original viewBox from the source SVG to maintain proper scaling
-    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${originalViewBox}">${innerContent}</svg>`;
+    // Create a complete standalone SVG with proper namespaces and definitions
+    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${originalViewBox}" width="24" height="24">
+      ${defsContent}
+      ${styleContent}
+      ${innerContent}
+    </svg>`;
     
     console.log('Created standalone icon, content length:', svgContent.length);
     console.log('ViewBox used:', originalViewBox);
-    console.log('Inner content preview:', innerContent.substring(0, 100) + '...');
     
     return svgContent;
   };
@@ -57,24 +76,37 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     const hasLine = element.querySelector('line') !== null;
     const hasPolyline = element.querySelector('polyline') !== null;
     const hasEllipse = element.querySelector('ellipse') !== null;
+    const hasUse = element.querySelector('use') !== null;
     
-    if (!hasPath && !hasCircle && !hasRect && !hasPolygon && !hasLine && !hasPolyline && !hasEllipse) {
+    if (!hasPath && !hasCircle && !hasRect && !hasPolygon && !hasLine && !hasPolyline && !hasEllipse && !hasUse) {
       return false;
     }
 
-    // Additional validation for paths - make sure they have meaningful data
+    // Check for meaningful path data if paths exist
     if (hasPath) {
       const paths = element.querySelectorAll('path');
       let hasValidPath = false;
       paths.forEach(path => {
         const pathData = path.getAttribute('d');
-        if (pathData && pathData.trim().length > 10) { // Meaningful path data
+        if (pathData && pathData.trim().length > 5) { // More lenient path validation
           hasValidPath = true;
         }
       });
-      if (!hasValidPath && !hasCircle && !hasRect && !hasPolygon && !hasLine && !hasPolyline && !hasEllipse) {
+      if (!hasValidPath && !hasCircle && !hasRect && !hasPolygon && !hasLine && !hasPolyline && !hasEllipse && !hasUse) {
         return false;
       }
+    }
+
+    // Check if element has reasonable bounding box (if possible)
+    try {
+      if ('getBBox' in element) {
+        const bbox = (element as any).getBBox();
+        if (bbox.width < 1 || bbox.height < 1) {
+          return false;
+        }
+      }
+    } catch (e) {
+      // getBBox might fail, continue with other validation
     }
 
     return true;
@@ -112,7 +144,7 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
     symbols.forEach((symbol, index) => {
       if (isValidIconElement(symbol)) {
         const iconId = symbol.getAttribute('id') || `symbol-${index}`;
-        const svgWrapper = createStandaloneIcon(symbol, viewBox);
+        const svgWrapper = createStandaloneIcon(symbol, viewBox, svgElement);
         
         console.log(`Creating symbol icon: ${iconId}`);
         
@@ -132,8 +164,8 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
       }
     });
 
-    // Strategy 2: Extract groups with IDs (second priority) - ONLY if we don't have many symbols
-    if (icons.length < 5) {
+    // Strategy 2: Extract groups with IDs (second priority)
+    if (icons.length < 10) { // Increased threshold to get more icons
       setCurrentStrategy('Extracting named groups...');
       const namedGroups = Array.from(svgElement.querySelectorAll('g[id]'));
       console.log(`Found ${namedGroups.length} named groups`);
@@ -141,7 +173,7 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
       namedGroups.forEach((group, index) => {
         if (isValidIconElement(group)) {
           const groupId = group.getAttribute('id') || `group-${index}`;
-          const svgWrapper = createStandaloneIcon(group, viewBox);
+          const svgWrapper = createStandaloneIcon(group, viewBox, svgElement);
           
           console.log(`Creating group icon: ${groupId}`);
           console.log('Group has children:', group.children.length);
@@ -165,24 +197,28 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
       });
     }
 
-    // Strategy 3: Extract all groups if still not enough icons
-    if (icons.length < 3) {
+    // Strategy 3: Extract ALL groups if still not enough icons (more aggressive)
+    if (icons.length < 15) { // Lower threshold to be more inclusive
       setCurrentStrategy('Extracting all content groups...');
       const allGroups = Array.from(svgElement.querySelectorAll('g')).slice(0, 50);
       console.log(`Found ${allGroups.length} total groups`);
       
       let validGroupCount = 0;
       allGroups.forEach((group, index) => {
-        if (isValidIconElement(group) && validGroupCount < 25) {
-          const groupId = group.getAttribute('id') || group.getAttribute('class') || `icon-${validGroupCount + 1}`;
-          const svgWrapper = createStandaloneIcon(group, viewBox);
+        // Skip groups we already processed
+        const groupId = group.getAttribute('id');
+        const alreadyProcessed = groupId && icons.some(icon => icon.name.toLowerCase().includes(groupId.toLowerCase()));
+        
+        if (!alreadyProcessed && isValidIconElement(group) && validGroupCount < 30) {
+          const displayId = groupId || group.getAttribute('class') || `icon-${validGroupCount + 1}`;
+          const svgWrapper = createStandaloneIcon(group, viewBox, svgElement);
           
-          console.log(`Creating auto group icon ${validGroupCount + 1}: ${groupId}`);
+          console.log(`Creating auto group icon ${validGroupCount + 1}: ${displayId}`);
           
           icons.push({
             id: `${fileName}-auto-${validGroupCount}-${Date.now()}`,
             svgContent: svgWrapper,
-            name: `Icon ${validGroupCount + 1}`,
+            name: groupId ? groupId.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : `Icon ${validGroupCount + 1}`,
             category: 'Auto-extracted',
             description: `Extracted from ${fileName}`,
             keywords: ['auto', 'extracted'],
@@ -197,16 +233,16 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
       });
     }
 
-    // Strategy 4: Extract individual paths if we still have very few icons
-    if (icons.length === 0) {
+    // Strategy 4: Extract individual paths with meaningful content
+    if (icons.length < 5) {
       setCurrentStrategy('Extracting individual paths...');
       const paths = Array.from(svgElement.querySelectorAll('path')).slice(0, 20);
       console.log(`Found ${paths.length} paths as fallback`);
       
       paths.forEach((path, index) => {
         const pathData = path.getAttribute('d');
-        if (pathData && pathData.length > 20) {
-          const svgWrapper = createStandaloneIcon(path, viewBox);
+        if (pathData && pathData.length > 15) { // More lenient validation
+          const svgWrapper = createStandaloneIcon(path, viewBox, svgElement);
           
           console.log(`Creating path icon ${index + 1}`);
           
@@ -227,18 +263,20 @@ export const SmartIconExtractor: React.FC<SmartIconExtractorProps> = ({
       });
     }
 
-    // Remove duplicates based on similar SVG content length (basic deduplication)
+    // Basic deduplication based on content similarity
     const uniqueIcons = icons.filter((icon, index, arr) => {
       return arr.findIndex(other => 
-        Math.abs(other.svgContent.length - icon.svgContent.length) < 50
+        Math.abs(other.svgContent.length - icon.svgContent.length) < 100 &&
+        other.name !== icon.name
       ) === index;
     });
 
-    const finalCount = Math.min(uniqueIcons.length, 30);
-    const finalIcons = uniqueIcons.slice(0, finalCount);
+    const finalIcons = uniqueIcons.slice(0, 30);
     
     console.log(`Successfully extracted ${finalIcons.length} unique icons from ${fileName}`);
-    console.log('Sample icon SVG:', finalIcons[0]?.svgContent?.substring(0, 300));
+    if (finalIcons[0]) {
+      console.log('Sample icon SVG preview:', finalIcons[0].svgContent.substring(0, 200));
+    }
     
     setExtractionStats(prev => [...prev, `${fileName}: ${finalIcons.length} icons extracted`]);
     
