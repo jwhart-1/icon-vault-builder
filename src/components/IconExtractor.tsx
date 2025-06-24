@@ -70,29 +70,37 @@ export const IconExtractor: React.FC<IconExtractorProps> = ({
         svgWrapper.setAttribute('height', height.toString());
         svgWrapper.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
         
-        // Copy essential attributes from root SVG
-        const stylesToCopy = ['fill', 'stroke', 'stroke-width'];
-        stylesToCopy.forEach(attr => {
-          const value = rootSvg.getAttribute(attr);
-          if (value) {
-            svgWrapper.setAttribute(attr, value);
+        // Clone the element
+        const clonedElement = element.cloneNode(true) as Element;
+        
+        // Ensure visibility for extracted icons
+        const allPaths = clonedElement.querySelectorAll('path, circle, rect, polygon, line, ellipse');
+        allPaths.forEach(path => {
+          if (!path.getAttribute('fill') && !path.getAttribute('stroke')) {
+            path.setAttribute('fill', 'currentColor');
+          }
+          if (path.getAttribute('fill') === 'none' && !path.getAttribute('stroke')) {
+            path.setAttribute('stroke', 'currentColor');
+            path.setAttribute('stroke-width', '1');
           }
         });
         
-        // Clone the element with limited depth to prevent infinite loops
-        const clonedElement = element.cloneNode(true) as Element;
         svgWrapper.appendChild(clonedElement);
 
         const serializer = new XMLSerializer();
         const svgString = serializer.serializeToString(svgWrapper);
 
-        // Limit individual SVG size
-        if (svgString.length > 50000) { // 50KB limit per icon
-          console.warn(`Icon ${index} too large, skipping`);
+        // Validate the SVG
+        if (svgString.length < 100 || svgString.length > 50000) {
+          console.warn(`Icon ${index} invalid size, skipping`);
           return null;
         }
 
-        console.log(`Created icon ${index + 1} from ${elementType}`);
+        console.log(`Created icon ${index + 1} from ${elementType}`, {
+          contentLength: svgString.length,
+          hasViewBox: svgString.includes('viewBox'),
+          dimensions: { width, height }
+        });
 
         return {
           id: `${fileName.replace('.svg', '')}-${elementType}-${index}-${Date.now()}`,
