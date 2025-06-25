@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import { Search, Grid, List, Download, Eye, Heart, Plus, Upload } from 'lucide-react';
@@ -26,7 +25,7 @@ export const IconifyBrowser: React.FC<IconifyBrowserProps> = ({
   const [searchResults, setSearchResults] = useState([]);
   const [selectedCollection, setSelectedCollection] = useState('all');
   const [isLoading, setIsLoading] = useState(false);
-  const [currentTab, setCurrentTab] = useState<'iconify' | 'uploaded'>('uploaded'); // Default to uploaded tab
+  const [currentTab, setCurrentTab] = useState<'iconify' | 'uploaded'>('uploaded');
   const { toast } = useToast();
 
   // Popular Iconify collections
@@ -77,7 +76,7 @@ export const IconifyBrowser: React.FC<IconifyBrowserProps> = ({
   // Fixed filtering logic for extracted icons
   const filteredExtractedIcons = currentTab === 'uploaded' 
     ? extractedIcons.filter(icon => {
-        if (!searchTerm.trim()) return true; // Show all icons when no search term
+        if (!searchTerm.trim()) return true;
         const matchesSearch = icon.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                icon.keywords.some(keyword => keyword.toLowerCase().includes(searchTerm.toLowerCase()));
         return matchesSearch;
@@ -245,20 +244,20 @@ export const IconifyBrowser: React.FC<IconifyBrowserProps> = ({
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-1 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {filteredExtractedIcons.map((icon) => (
                     <div
                       key={icon.id}
                       onClick={() => onIconSelected(icon)}
-                      className="cursor-pointer transition-all duration-200 hover:shadow-md bg-slate-50 rounded-lg p-8 text-center hover:bg-blue-50"
+                      className="cursor-pointer transition-all duration-200 hover:shadow-md bg-slate-50 rounded-lg p-6 text-center hover:bg-blue-50"
                     >
-                      <div className="flex items-center justify-center mb-6">
+                      <div className="flex items-center justify-center mb-4">
                         <UnifiedIconDisplay icon={icon} size={1000} />
                       </div>
-                      <p className="text-lg font-medium text-slate-800 truncate">
+                      <p className="text-sm font-medium text-slate-800 truncate">
                         {icon.name}
                       </p>
-                      <p className="text-sm text-blue-600 mt-2">
+                      <p className="text-xs text-blue-600 mt-1">
                         Extracted
                       </p>
                     </div>
