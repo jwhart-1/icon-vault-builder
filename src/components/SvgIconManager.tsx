@@ -1,33 +1,43 @@
-
 import React, { useState, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
 import { SmartIconExtractor } from './SmartIconExtractor';
 import { IconGrid } from './IconGrid';
 import { SearchAndFilter } from './SearchAndFilter';
 import { IconifyBrowser } from './IconifyBrowser';
-import { IconifySearch, IconifyIcon } from './IconifySearch';
+import { IconifySearch } from './IconifySearch';
 import { IconifyIconCard } from './IconifyIconCard';
 import { useIconStorage } from '@/hooks/useIconStorage';
 import { useToast } from '@/hooks/use-toast';
 
-export interface ExtractedIcon {
+export interface BaseIcon {
   id: string;
-  svgContent: string;
   name: string;
   category: string;
   description: string;
   keywords: string[];
   license: string;
   author: string;
+}
+
+export interface ExtractedIcon extends BaseIcon {
+  type: 'extracted';
+  svgContent: string;
   dimensions: { width: number; height: number };
   fileSize: number;
 }
 
+export interface IconifyIcon extends BaseIcon {
+  type: 'iconify';
+  iconifyName: string; // e.g., 'mdi:home', 'lucide:play'
+  collection: string; // e.g., 'Material Design Icons', 'Lucide'
+}
+
+export type UnifiedIcon = ExtractedIcon | IconifyIcon;
+
 export const SvgIconManager = () => {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [extractedIcons, setExtractedIcons] = useState<ExtractedIcon[]>([]);
-  const [iconifyIcons, setIconifyIcons] = useState<IconifyIcon[]>([]);
-  const [savedIcons, setSavedIcons] = useState<ExtractedIcon[]>([]);
+  const [extractedIcons, setExtractedIcons] = useState<UnifiedIcon[]>([]);
+  const [savedIcons, setSavedIcons] = useState<UnifiedIcon[]>([]);
   const [currentStep, setCurrentStep] = useState<'upload' | 'extract' | 'search' | 'browse' | 'manage'>('search');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -38,7 +48,12 @@ export const SvgIconManager = () => {
   useEffect(() => {
     const loadSavedIcons = async () => {
       const icons = await loadIcons();
-      setSavedIcons(icons);
+      // Convert legacy ExtractedIcon format to new unified format
+      const unifiedIcons: UnifiedIcon[] = icons.map(icon => ({
+        ...icon,
+        type: 'extracted' as const
+      }));
+      setSavedIcons(unifiedIcons);
     };
     loadSavedIcons();
   }, []);
@@ -52,8 +67,13 @@ export const SvgIconManager = () => {
     });
   };
 
-  const handleIconsExtracted = (icons: ExtractedIcon[]) => {
-    setExtractedIcons(icons);
+  const handleIconsExtracted = (icons: any[]) => {
+    // Convert extracted icons to unified format
+    const unifiedIcons: ExtractedIcon[] = icons.map(icon => ({
+      ...icon,
+      type: 'extracted' as const
+    }));
+    setExtractedIcons(unifiedIcons);
     setCurrentStep('manage');
     toast({
       title: 'Icons extracted successfully',
@@ -61,26 +81,26 @@ export const SvgIconManager = () => {
     });
   };
 
-  const handleIconifyIconSelected = async (icon: IconifyIcon) => {
+  const handleIconifyIconSelected = async (icon: any) => {
     try {
-      // Convert IconifyIcon to ExtractedIcon format
+      // Convert IconifyIcon to unified format
       const response = await fetch(`https://api.iconify.design/${icon.iconifyName}.svg`);
       const svgContent = await response.text();
       
-      const extractedIcon: ExtractedIcon = {
+      const unifiedIcon: IconifyIcon = {
         id: icon.id,
-        svgContent: svgContent,
         name: icon.name,
         category: icon.category,
         description: icon.description,
         keywords: icon.keywords,
         license: icon.license,
         author: icon.author,
-        dimensions: { width: 24, height: 24 },
-        fileSize: new Blob([svgContent]).size,
+        type: 'iconify',
+        iconifyName: icon.iconifyName,
+        collection: icon.collection,
       };
 
-      setExtractedIcons(prev => [...prev, extractedIcon]);
+      setExtractedIcons(prev => [...prev, unifiedIcon]);
       
       if (currentStep !== 'manage') {
         setCurrentStep('manage');
@@ -100,13 +120,27 @@ export const SvgIconManager = () => {
     }
   };
 
-  const handleIconifyIconSaved = async (icon: IconifyIcon) => {
+  const handleIconifyIconSaved = async (icon: any) => {
     try {
-      // Convert to ExtractedIcon format and save
+      // Convert to unified format and save
+      const unifiedIcon: IconifyIcon = {
+        id: icon.id,
+        name: icon.name,
+        category: icon.category,
+        description: icon.description,
+        keywords: icon.keywords,
+        license: icon.license,
+        author: icon.author,
+        type: 'iconify',
+        iconifyName: icon.iconifyName,
+        collection: icon.collection,
+      };
+
+      // For storage, we need to convert to ExtractedIcon format for now
       const response = await fetch(`https://api.iconify.design/${icon.iconifyName}.svg`);
       const svgContent = await response.text();
       
-      const extractedIcon: ExtractedIcon = {
+      const extractedForStorage = {
         id: icon.id,
         svgContent: svgContent,
         name: icon.name,
@@ -119,10 +153,9 @@ export const SvgIconManager = () => {
         fileSize: new Blob([svgContent]).size,
       };
 
-      const success = await saveIcon(extractedIcon);
+      const success = await saveIcon(extractedForStorage);
       if (success) {
-        setSavedIcons(prev => [...prev, extractedIcon]);
-        setIconifyIcons(prev => prev.filter(i => i.id !== icon.id));
+        setSavedIcons(prev => [...prev, unifiedIcon]);
       }
     } catch (error) {
       console.error('Error saving Iconify icon:', error);
@@ -134,8 +167,41 @@ export const SvgIconManager = () => {
     }
   };
 
-  const handleIconSaved = async (icon: ExtractedIcon) => {
-    const success = await saveIcon(icon);
+  const handleIconSaved = async (icon: UnifiedIcon) => {
+    let iconForStorage;
+    
+    if (icon.type === 'iconify') {
+      // Convert Iconify icon to storage format
+      try {
+        const response = await fetch(`https://api.iconify.design/${icon.iconifyName}.svg`);
+        const svgContent = await response.text();
+        
+        iconForStorage = {
+          id: icon.id,
+          svgContent: svgContent,
+          name: icon.name,
+          category: icon.category,
+          description: icon.description,
+          keywords: icon.keywords,
+          license: icon.license,
+          author: icon.author,
+          dimensions: { width: 24, height: 24 },
+          fileSize: new Blob([svgContent]).size,
+        };
+      } catch (error) {
+        console.error('Error fetching Iconify SVG for storage:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to save icon',
+          variant: 'destructive',
+        });
+        return;
+      }
+    } else {
+      iconForStorage = icon;
+    }
+
+    const success = await saveIcon(iconForStorage);
     if (success) {
       setSavedIcons(prev => [...prev, icon]);
       setExtractedIcons(prev => prev.filter(i => i.id !== icon.id));

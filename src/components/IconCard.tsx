@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { ExtractedIcon } from './SvgIconManager';
+import { Icon } from '@iconify/react';
 import { Download, Eye, Trash2 } from 'lucide-react';
+import type { UnifiedIcon, ExtractedIcon, IconifyIcon } from './SvgIconManager';
 
 interface IconCardProps {
-  icon: ExtractedIcon;
-  onSave: (icon: ExtractedIcon) => void;
+  icon: UnifiedIcon;
+  onSave: (icon: UnifiedIcon) => void;
   onDelete: (iconId: string) => void;
   showMetadataForm: boolean;
   isLoading?: boolean;
@@ -177,6 +178,28 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
   }
 };
 
+// Unified Icon Display Component
+const UnifiedIconDisplay: React.FC<{ icon: UnifiedIcon; size?: number }> = ({ icon, size = 120 }) => {
+  if (icon.type === 'iconify') {
+    return (
+      <Icon 
+        icon={icon.iconifyName} 
+        width={size} 
+        height={size}
+        className="text-slate-800"
+      />
+    );
+  } else {
+    return (
+      <SVGIcon 
+        svgContent={icon.svgContent} 
+        name={icon.name}
+        size={size}
+      />
+    );
+  }
+};
+
 export const IconCard: React.FC<IconCardProps> = ({
   icon,
   onSave,
@@ -192,27 +215,44 @@ export const IconCard: React.FC<IconCardProps> = ({
     }
   };
 
-  const downloadIcon = () => {
-    const blob = new Blob([icon.svgContent], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${icon.name}.svg`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const downloadIcon = async () => {
+    try {
+      if (icon.type === 'iconify') {
+        // Download Iconify icon
+        const response = await fetch(`https://api.iconify.design/${icon.iconifyName}.svg`);
+        const svgContent = await response.text();
+        
+        const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${icon.name}.svg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        // Download extracted icon
+        const blob = new Blob([icon.svgContent], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${icon.name}.svg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
   };
 
   return (
     <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:shadow-md transition-shadow">
       {/* Icon Preview */}
       <div className="aspect-square bg-white rounded-lg mb-4 flex items-center justify-center p-8 border">
-        <SVGIcon 
-          svgContent={icon.svgContent} 
-          name={icon.name}
-          size={120}
-        />
+        <UnifiedIconDisplay icon={icon} size={120} />
       </div>
 
       {/* Icon Info */}
@@ -220,9 +260,24 @@ export const IconCard: React.FC<IconCardProps> = ({
         <h3 className="font-semibold text-slate-800 truncate" title={icon.name}>
           {icon.name}
         </h3>
-        <div className="flex justify-between text-sm text-slate-600">
-          <span>{icon.dimensions.width}×{icon.dimensions.height}</span>
-          <span>{(icon.fileSize / 1024).toFixed(1)}KB</span>
+        
+        <div className="text-sm text-slate-600">
+          {icon.type === 'iconify' ? (
+            <>
+              <div className="truncate" title={icon.iconifyName}>
+                {icon.iconifyName}
+              </div>
+              <div className="text-xs text-slate-500">{icon.collection}</div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between">
+                <span>{icon.dimensions.width}×{icon.dimensions.height}</span>
+                <span>{(icon.fileSize / 1024).toFixed(1)}KB</span>
+              </div>
+              <div className="text-xs text-slate-500">Extracted Icon</div>
+            </>
+          )}
         </div>
         
         {icon.category && (
@@ -246,7 +301,7 @@ export const IconCard: React.FC<IconCardProps> = ({
             disabled={isLoading}
             className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
           >
-            {isLoading ? 'Saving...' : 'Add Metadata'}
+            {isLoading ? 'Saving...' : 'Add to Library'}
           </button>
         )}
         
@@ -261,7 +316,7 @@ export const IconCard: React.FC<IconCardProps> = ({
         <button
           onClick={downloadIcon}
           className="p-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-colors"
-          title="Download"
+          title="Download SVG"
         >
           <Download className="h-4 w-4" />
         </button>
@@ -271,7 +326,7 @@ export const IconCard: React.FC<IconCardProps> = ({
             onClick={handleDelete}
             disabled={isLoading}
             className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
-            title="Delete"
+            title="Remove from Library"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -293,16 +348,24 @@ export const IconCard: React.FC<IconCardProps> = ({
             </div>
             
             <div className="bg-slate-50 rounded-lg p-8 mb-4 flex items-center justify-center">
-              <SVGIcon 
-                svgContent={icon.svgContent} 
-                name={icon.name}
-                size={240}
-              />
+              <UnifiedIconDisplay icon={icon} size={240} />
             </div>
             
-            <div className="text-sm text-slate-600">
-              <p><strong>Dimensions:</strong> {icon.dimensions.width}×{icon.dimensions.height}</p>
-              <p><strong>File Size:</strong> {(icon.fileSize / 1024).toFixed(1)}KB</p>
+            <div className="text-sm text-slate-600 space-y-2">
+              {icon.type === 'iconify' ? (
+                <>
+                  <p><strong>Iconify Name:</strong> {icon.iconifyName}</p>
+                  <p><strong>Collection:</strong> {icon.collection}</p>
+                  <p><strong>License:</strong> {icon.license || 'Check collection license'}</p>
+                </>
+              ) : (
+                <>
+                  <p><strong>Dimensions:</strong> {icon.dimensions.width}×{icon.dimensions.height}</p>
+                  <p><strong>File Size:</strong> {(icon.fileSize / 1024).toFixed(1)}KB</p>
+                  <p><strong>Type:</strong> Extracted SVG</p>
+                </>
+              )}
+              {icon.author && <p><strong>Author:</strong> {icon.author}</p>}
             </div>
           </div>
         </div>
