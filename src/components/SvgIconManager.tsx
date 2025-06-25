@@ -4,6 +4,7 @@ import { FileUpload } from './FileUpload';
 import { SmartIconExtractor } from './SmartIconExtractor';
 import { IconGrid } from './IconGrid';
 import { SearchAndFilter } from './SearchAndFilter';
+import { IconifyBrowser } from './IconifyBrowser';
 import { useIconStorage } from '@/hooks/useIconStorage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,7 +25,7 @@ export const SvgIconManager = () => {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [extractedIcons, setExtractedIcons] = useState<ExtractedIcon[]>([]);
   const [savedIcons, setSavedIcons] = useState<ExtractedIcon[]>([]);
-  const [currentStep, setCurrentStep] = useState<'upload' | 'extract' | 'manage'>('upload');
+  const [currentStep, setCurrentStep] = useState<'upload' | 'extract' | 'browse' | 'manage'>('upload');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const { saveIcon, loadIcons, deleteIcon, isLoading } = useIconStorage();
@@ -55,6 +56,13 @@ export const SvgIconManager = () => {
       title: 'Icons extracted successfully',
       description: `Found ${icons.length} individual icon(s) ready for metadata entry`,
     });
+  };
+
+  const handleIconifyIconSelected = (icon: ExtractedIcon) => {
+    setExtractedIcons(prev => [...prev, icon]);
+    if (currentStep !== 'manage') {
+      setCurrentStep('manage');
+    }
   };
 
   const handleIconSaved = async (icon: ExtractedIcon) => {
@@ -100,12 +108,49 @@ export const SvgIconManager = () => {
             <span>Extract Icons</span>
           </div>
           <div className="w-8 h-px bg-slate-300"></div>
+          <div className={`flex items-center space-x-2 ${currentStep === 'browse' ? 'text-blue-600' : 'text-slate-400'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'browse' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>
+              3
+            </div>
+            <span>Browse Iconify</span>
+          </div>
+          <div className="w-8 h-px bg-slate-300"></div>
           <div className={`flex items-center space-x-2 ${currentStep === 'manage' ? 'text-blue-600' : 'text-slate-400'}`}>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'manage' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>
-              3
+              4
             </div>
             <span>Manage Library</span>
           </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="flex justify-center mb-6">
+        <div className="flex space-x-2 bg-slate-100 rounded-lg p-1">
+          <button
+            onClick={() => setCurrentStep('upload')}
+            className={`px-4 py-2 rounded-md transition-colors ${
+              currentStep === 'upload' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'
+            }`}
+          >
+            Upload Files
+          </button>
+          <button
+            onClick={() => setCurrentStep('browse')}
+            className={`px-4 py-2 rounded-md transition-colors ${
+              currentStep === 'browse' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'
+            }`}
+          >
+            Browse Icons
+          </button>
+          <button
+            onClick={() => setCurrentStep('manage')}
+            className={`px-4 py-2 rounded-md transition-colors ${
+              currentStep === 'manage' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'
+            }`}
+          >
+            Manage Library
+          </button>
         </div>
       </div>
 
@@ -124,6 +169,10 @@ export const SvgIconManager = () => {
 
       {currentStep === 'extract' && (
         <SmartIconExtractor files={uploadedFiles} onIconsExtracted={handleIconsExtracted} />
+      )}
+
+      {currentStep === 'browse' && (
+        <IconifyBrowser onIconSelected={handleIconifyIconSelected} />
       )}
 
       {currentStep === 'manage' && (
@@ -167,22 +216,6 @@ export const SvgIconManager = () => {
               />
             </div>
           )}
-        </div>
-      )}
-
-      {/* Reset button */}
-      {currentStep !== 'upload' && (
-        <div className="text-center mt-8">
-          <button
-            onClick={() => {
-              setCurrentStep('upload');
-              setUploadedFiles([]);
-              setExtractedIcons([]);
-            }}
-            className="px-6 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors"
-          >
-            Upload More Files
-          </button>
         </div>
       )}
     </div>
