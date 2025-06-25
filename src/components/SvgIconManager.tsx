@@ -1,9 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
 import { SmartIconExtractor } from './SmartIconExtractor';
 import { IconGrid } from './IconGrid';
 import { SearchAndFilter } from './SearchAndFilter';
 import { IconifyBrowser } from './IconifyBrowser';
+import { IconifySearch, IconifyIcon } from './IconifySearch';
+import { IconifyIconCard } from './IconifyIconCard';
 import { useIconStorage } from '@/hooks/useIconStorage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -23,8 +26,9 @@ export interface ExtractedIcon {
 export const SvgIconManager = () => {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [extractedIcons, setExtractedIcons] = useState<ExtractedIcon[]>([]);
+  const [iconifyIcons, setIconifyIcons] = useState<IconifyIcon[]>([]);
   const [savedIcons, setSavedIcons] = useState<ExtractedIcon[]>([]);
-  const [currentStep, setCurrentStep] = useState<'upload' | 'extract' | 'browse' | 'manage'>('upload');
+  const [currentStep, setCurrentStep] = useState<'upload' | 'extract' | 'search' | 'browse' | 'manage'>('search');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const { saveIcon, loadIcons, deleteIcon, isLoading } = useIconStorage();
@@ -57,10 +61,76 @@ export const SvgIconManager = () => {
     });
   };
 
-  const handleIconifyIconSelected = (icon: ExtractedIcon) => {
-    setExtractedIcons(prev => [...prev, icon]);
-    if (currentStep !== 'manage') {
-      setCurrentStep('manage');
+  const handleIconifyIconSelected = async (icon: IconifyIcon) => {
+    try {
+      // Convert IconifyIcon to ExtractedIcon format
+      const response = await fetch(`https://api.iconify.design/${icon.iconifyName}.svg`);
+      const svgContent = await response.text();
+      
+      const extractedIcon: ExtractedIcon = {
+        id: icon.id,
+        svgContent: svgContent,
+        name: icon.name,
+        category: icon.category,
+        description: icon.description,
+        keywords: icon.keywords,
+        license: icon.license,
+        author: icon.author,
+        dimensions: { width: 24, height: 24 },
+        fileSize: new Blob([svgContent]).size,
+      };
+
+      setExtractedIcons(prev => [...prev, extractedIcon]);
+      
+      if (currentStep !== 'manage') {
+        setCurrentStep('manage');
+      }
+      
+      toast({
+        title: 'Icon selected',
+        description: `${icon.name} has been added to your collection`,
+      });
+    } catch (error) {
+      console.error('Error fetching icon SVG:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch icon data',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleIconifyIconSaved = async (icon: IconifyIcon) => {
+    try {
+      // Convert to ExtractedIcon format and save
+      const response = await fetch(`https://api.iconify.design/${icon.iconifyName}.svg`);
+      const svgContent = await response.text();
+      
+      const extractedIcon: ExtractedIcon = {
+        id: icon.id,
+        svgContent: svgContent,
+        name: icon.name,
+        category: icon.category,
+        description: icon.description,
+        keywords: icon.keywords,
+        license: icon.license,
+        author: icon.author,
+        dimensions: { width: 24, height: 24 },
+        fileSize: new Blob([svgContent]).size,
+      };
+
+      const success = await saveIcon(extractedIcon);
+      if (success) {
+        setSavedIcons(prev => [...prev, extractedIcon]);
+        setIconifyIcons(prev => prev.filter(i => i.id !== icon.id));
+      }
+    } catch (error) {
+      console.error('Error saving Iconify icon:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save icon',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -93,30 +163,37 @@ export const SvgIconManager = () => {
       {/* Progress Steps */}
       <div className="flex justify-center mb-8">
         <div className="flex items-center space-x-4">
+          <div className={`flex items-center space-x-2 ${currentStep === 'search' ? 'text-blue-600' : 'text-slate-400'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'search' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>
+              1
+            </div>
+            <span>Search Icons</span>
+          </div>
+          <div className="w-8 h-px bg-slate-300"></div>
           <div className={`flex items-center space-x-2 ${currentStep === 'upload' ? 'text-blue-600' : 'text-slate-400'}`}>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'upload' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>
-              1
+              2
             </div>
             <span>Upload SVG Files</span>
           </div>
           <div className="w-8 h-px bg-slate-300"></div>
           <div className={`flex items-center space-x-2 ${currentStep === 'extract' ? 'text-blue-600' : 'text-slate-400'}`}>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'extract' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>
-              2
+              3
             </div>
             <span>Extract Icons</span>
           </div>
           <div className="w-8 h-px bg-slate-300"></div>
           <div className={`flex items-center space-x-2 ${currentStep === 'browse' ? 'text-blue-600' : 'text-slate-400'}`}>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'browse' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>
-              3
+              4
             </div>
-            <span>Browse Icons</span>
+            <span>Browse Uploaded</span>
           </div>
           <div className="w-8 h-px bg-slate-300"></div>
           <div className={`flex items-center space-x-2 ${currentStep === 'manage' ? 'text-blue-600' : 'text-slate-400'}`}>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'manage' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>
-              4
+              5
             </div>
             <span>Manage Library</span>
           </div>
@@ -126,6 +203,14 @@ export const SvgIconManager = () => {
       {/* Navigation */}
       <div className="flex justify-center mb-6">
         <div className="flex space-x-2 bg-slate-100 rounded-lg p-1">
+          <button
+            onClick={() => setCurrentStep('search')}
+            className={`px-4 py-2 rounded-md transition-colors ${
+              currentStep === 'search' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'
+            }`}
+          >
+            Search Icons
+          </button>
           <button
             onClick={() => setCurrentStep('upload')}
             className={`px-4 py-2 rounded-md transition-colors ${
@@ -140,7 +225,7 @@ export const SvgIconManager = () => {
               currentStep === 'browse' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'
             }`}
           >
-            Browse Icons
+            Browse Uploaded
           </button>
           <button
             onClick={() => setCurrentStep('manage')}
@@ -154,6 +239,10 @@ export const SvgIconManager = () => {
       </div>
 
       {/* Content based on current step */}
+      {currentStep === 'search' && (
+        <IconifySearch onIconSelected={handleIconifyIconSelected} />
+      )}
+
       {currentStep === 'upload' && (
         <div>
           <div className="text-center mb-6">
