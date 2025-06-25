@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
 import { SmartIconExtractor } from './SmartIconExtractor';
@@ -316,7 +315,11 @@ export const SvgIconManager = () => {
       )}
 
       {currentStep === 'browse' && (
-        <IconifyBrowser onIconSelected={handleIconifyIconSelected} uploadedFiles={uploadedFiles} />
+        <IconifyBrowser 
+          onIconSelected={handleIconifyIconSelected} 
+          uploadedFiles={uploadedFiles}
+          extractedIcons={extractedIcons}
+        />
       )}
 
       {currentStep === 'manage' && (
