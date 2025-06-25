@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
 import { SmartIconExtractor } from './SmartIconExtractor';
@@ -44,16 +45,29 @@ export const SvgIconManager = () => {
   const { saveIcon, loadIcons, deleteIcon, isLoading } = useIconStorage();
   const { toast } = useToast();
 
+  // ADD DEBUG LOGGING
+  console.log('🔍 Debug - SvgIconManager State:', {
+    currentStep,
+    extractedIconsCount: extractedIcons.length,
+    savedIconsCount: savedIcons.length,
+    uploadedFilesCount: uploadedFiles.length,
+    extractedIcons: extractedIcons,
+    savedIcons: savedIcons
+  });
+
   // Load saved icons on component mount
   useEffect(() => {
     const loadSavedIcons = async () => {
+      console.log('🔍 Debug - Loading saved icons...');
       const icons = await loadIcons();
+      console.log('🔍 Debug - Loaded icons:', icons);
       setSavedIcons(icons);
     };
     loadSavedIcons();
   }, []);
 
   const handleFilesUploaded = (files: File[]) => {
+    console.log('🔍 Debug - Files uploaded:', files);
     setUploadedFiles(files);
     setCurrentStep('extract');
     toast({
@@ -63,6 +77,7 @@ export const SvgIconManager = () => {
   };
 
   const handleIconsExtracted = (icons: UnifiedIcon[]) => {
+    console.log('🔍 Debug - Icons extracted:', icons);
     setExtractedIcons(icons);
     setCurrentStep('manage');
     toast({
@@ -215,6 +230,18 @@ export const SvgIconManager = () => {
 
   return (
     <div className="max-w-7xl mx-auto">
+      {/* TEMPORARY DEBUG INFO */}
+      <div className="bg-yellow-100 p-4 mb-4 rounded-lg">
+        <h3 className="font-bold text-sm mb-2">Debug Information:</h3>
+        <div className="text-xs space-y-1">
+          <div>Current Step: <span className="font-mono">{currentStep}</span></div>
+          <div>Extracted Icons: <span className="font-mono">{extractedIcons.length}</span></div>
+          <div>Saved Icons: <span className="font-mono">{savedIcons.length}</span></div>
+          <div>Uploaded Files: <span className="font-mono">{uploadedFiles.length}</span></div>
+          <div>Filtered Icons: <span className="font-mono">{filteredIcons.length}</span></div>
+        </div>
+      </div>
+
       {/* Progress Steps */}
       <div className="flex justify-center mb-8">
         <div className="flex items-center space-x-4">
@@ -317,7 +344,6 @@ export const SvgIconManager = () => {
       {currentStep === 'browse' && (
         <IconifyBrowser 
           onIconSelected={handleIconifyIconSelected} 
-          uploadedFiles={uploadedFiles}
           extractedIcons={extractedIcons}
         />
       )}
@@ -361,6 +387,14 @@ export const SvgIconManager = () => {
                 showMetadataForms={false}
                 isLoading={isLoading}
               />
+            </div>
+          )}
+
+          {extractedIcons.length === 0 && savedIcons.length === 0 && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">📦</div>
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">No icons yet</h3>
+              <p className="text-slate-500">Upload some SVG files or search for icons to get started.</p>
             </div>
           )}
         </div>
