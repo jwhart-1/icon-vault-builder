@@ -29,8 +29,8 @@ export interface ExtractedIcon extends BaseIcon {
 
 export interface IconifyIcon extends BaseIcon {
   type: 'iconify';
-  iconifyName: string; // e.g., 'mdi:home', 'lucide:play'
-  collection: string; // e.g., 'Material Design Icons', 'Lucide'
+  iconifyName: string;
+  collection: string;
 }
 
 export type UnifiedIcon = ExtractedIcon | IconifyIcon;
@@ -45,29 +45,17 @@ export const SvgIconManager = () => {
   const { saveIcon, loadIcons, deleteIcon, isLoading } = useIconStorage();
   const { toast } = useToast();
 
-  // ADD DEBUG LOGGING
-  console.log('🔍 Debug - SvgIconManager State:', {
-    currentStep,
-    extractedIconsCount: extractedIcons.length,
-    savedIconsCount: savedIcons.length,
-    uploadedFilesCount: uploadedFiles.length,
-    extractedIcons: extractedIcons,
-    savedIcons: savedIcons
-  });
-
   // Load saved icons on component mount
   useEffect(() => {
     const loadSavedIcons = async () => {
-      console.log('🔍 Debug - Loading saved icons...');
       const icons = await loadIcons();
-      console.log('🔍 Debug - Loaded icons:', icons);
       setSavedIcons(icons);
     };
     loadSavedIcons();
   }, []);
 
   const handleFilesUploaded = (files: File[]) => {
-    console.log('🔍 Debug - Files uploaded:', files);
+    console.log('📁 Files uploaded:', files.length);
     setUploadedFiles(files);
     setCurrentStep('extract');
     toast({
@@ -77,7 +65,7 @@ export const SvgIconManager = () => {
   };
 
   const handleIconsExtracted = (icons: UnifiedIcon[]) => {
-    console.log('🔍 Debug - Icons extracted:', icons);
+    console.log('🎯 Icons extracted successfully:', icons.length);
     setExtractedIcons(icons);
     setCurrentStep('manage');
     toast({
@@ -88,7 +76,6 @@ export const SvgIconManager = () => {
 
   const handleIconifyIconSelected = async (icon: any) => {
     try {
-      // Convert IconifyIcon to unified format
       const unifiedIcon: IconifyIcon = {
         id: icon.id,
         name: icon.name,
@@ -113,58 +100,10 @@ export const SvgIconManager = () => {
         description: `${icon.name} has been added to your collection`,
       });
     } catch (error) {
-      console.error('Error fetching icon SVG:', error);
+      console.error('Error selecting icon:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch icon data',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleIconifyIconSaved = async (icon: any) => {
-    try {
-      // Convert to unified format and save
-      const unifiedIcon: IconifyIcon = {
-        id: icon.id,
-        name: icon.name,
-        category: icon.category,
-        description: icon.description,
-        keywords: icon.keywords,
-        license: icon.license,
-        author: icon.author,
-        type: 'iconify',
-        iconifyName: icon.iconifyName,
-        collection: icon.collection,
-      };
-
-      // For storage, we need to convert to ExtractedIcon format for now
-      const response = await fetch(`https://api.iconify.design/${icon.iconifyName}.svg`);
-      const svgContent = await response.text();
-      
-      const extractedForStorage: ExtractedIcon = {
-        type: 'extracted',
-        id: icon.id,
-        svgContent: svgContent,
-        name: icon.name,
-        category: icon.category,
-        description: icon.description,
-        keywords: icon.keywords,
-        license: icon.license,
-        author: icon.author,
-        dimensions: { width: 24, height: 24 },
-        fileSize: new Blob([svgContent]).size,
-      };
-
-      const success = await saveIcon(extractedForStorage);
-      if (success) {
-        setSavedIcons(prev => [...prev, extractedForStorage]);
-      }
-    } catch (error) {
-      console.error('Error saving Iconify icon:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save icon',
+        description: 'Failed to select icon',
         variant: 'destructive',
       });
     }
@@ -174,7 +113,6 @@ export const SvgIconManager = () => {
     let iconForStorage: ExtractedIcon;
     
     if (icon.type === 'iconify') {
-      // Convert Iconify icon to storage format
       try {
         const response = await fetch(`https://api.iconify.design/${icon.iconifyName}.svg`);
         const svgContent = await response.text();
@@ -193,7 +131,7 @@ export const SvgIconManager = () => {
           fileSize: new Blob([svgContent]).size,
         };
       } catch (error) {
-        console.error('Error fetching Iconify SVG for storage:', error);
+        console.error('Error converting Iconify icon for storage:', error);
         toast({
           title: 'Error',
           description: 'Failed to save icon',
@@ -230,18 +168,6 @@ export const SvgIconManager = () => {
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* TEMPORARY DEBUG INFO */}
-      <div className="bg-yellow-100 p-4 mb-4 rounded-lg">
-        <h3 className="font-bold text-sm mb-2">Debug Information:</h3>
-        <div className="text-xs space-y-1">
-          <div>Current Step: <span className="font-mono">{currentStep}</span></div>
-          <div>Extracted Icons: <span className="font-mono">{extractedIcons.length}</span></div>
-          <div>Saved Icons: <span className="font-mono">{savedIcons.length}</span></div>
-          <div>Uploaded Files: <span className="font-mono">{uploadedFiles.length}</span></div>
-          <div>Filtered Icons: <span className="font-mono">{filteredIcons.length}</span></div>
-        </div>
-      </div>
-
       {/* Progress Steps */}
       <div className="flex justify-center mb-8">
         <div className="flex items-center space-x-4">
@@ -307,7 +233,7 @@ export const SvgIconManager = () => {
               currentStep === 'browse' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'
             }`}
           >
-            Browse Uploaded
+            Browse Uploaded ({extractedIcons.length})
           </button>
           <button
             onClick={() => setCurrentStep('manage')}
