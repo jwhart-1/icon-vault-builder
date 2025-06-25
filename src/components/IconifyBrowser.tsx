@@ -26,16 +26,8 @@ export const IconifyBrowser: React.FC<IconifyBrowserProps> = ({
   const [searchResults, setSearchResults] = useState([]);
   const [selectedCollection, setSelectedCollection] = useState('all');
   const [isLoading, setIsLoading] = useState(false);
-  const [currentTab, setCurrentTab] = useState<'iconify' | 'uploaded'>('iconify');
+  const [currentTab, setCurrentTab] = useState<'iconify' | 'uploaded'>('uploaded'); // Default to uploaded tab
   const { toast } = useToast();
-
-  // ADD DEBUG LOGGING
-  console.log('🔍 Debug - IconifyBrowser Props:', {
-    extractedIconsCount: extractedIcons.length,
-    extractedIcons: extractedIcons,
-    currentTab,
-    searchTerm
-  });
 
   // Popular Iconify collections
   const popularCollections = [
@@ -63,7 +55,6 @@ export const IconifyBrowser: React.FC<IconifyBrowserProps> = ({
         `https://api.iconify.design/search?query=${encodeURIComponent(query)}${collectionParam}&limit=50`
       );
       const data = await response.json();
-      console.log('🔍 Debug - Iconify search results:', data);
       setSearchResults(data.icons || []);
     } catch (error) {
       console.error('Search failed:', error);
@@ -83,16 +74,15 @@ export const IconifyBrowser: React.FC<IconifyBrowserProps> = ({
     }
   }, [searchTerm, selectedCollection, currentTab]);
 
-  // Filter extracted icons for uploaded tab
-  const filteredExtractedIcons = extractedIcons.filter(icon => {
-    if (currentTab !== 'uploaded') return false;
-    const matchesSearch = icon.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           icon.keywords.some(keyword => keyword.toLowerCase().includes(searchTerm.toLowerCase()));
-    console.log('🔍 Debug - Filtering icon:', icon.name, 'matches:', matchesSearch);
-    return matchesSearch;
-  });
-
-  console.log('🔍 Debug - Filtered extracted icons:', filteredExtractedIcons);
+  // Fixed filtering logic for extracted icons
+  const filteredExtractedIcons = currentTab === 'uploaded' 
+    ? extractedIcons.filter(icon => {
+        if (!searchTerm.trim()) return true; // Show all icons when no search term
+        const matchesSearch = icon.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+               icon.keywords.some(keyword => keyword.toLowerCase().includes(searchTerm.toLowerCase()));
+        return matchesSearch;
+      })
+    : [];
 
   const handleIconifyIconSelect = (iconName: string) => {
     const iconifyIcon = {
@@ -108,7 +98,6 @@ export const IconifyBrowser: React.FC<IconifyBrowserProps> = ({
       author: '',
     };
 
-    console.log('🔍 Debug - Iconify icon selected:', iconifyIcon);
     onIconSelected(iconifyIcon);
     
     toast({
@@ -119,14 +108,6 @@ export const IconifyBrowser: React.FC<IconifyBrowserProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Debug Info */}
-      <div className="bg-blue-50 p-3 rounded-lg text-xs">
-        <div>Current Tab: <span className="font-mono">{currentTab}</span></div>
-        <div>Extracted Icons: <span className="font-mono">{extractedIcons.length}</span></div>
-        <div>Filtered Icons: <span className="font-mono">{filteredExtractedIcons.length}</span></div>
-        <div>Search Term: <span className="font-mono">"{searchTerm}"</span></div>
-      </div>
-
       {/* Header */}
       <div className="text-center">
         <h2 className="text-2xl font-bold text-slate-800 mb-2">Browse Icon Libraries</h2>
