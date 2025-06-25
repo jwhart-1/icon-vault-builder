@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ExtractedIcon } from '@/components/SvgIconManager';
+import { ExtractedIcon, UnifiedIcon } from '@/components/SvgIconManager';
 import { useToast } from '@/hooks/use-toast';
 
 export interface IconRecord {
@@ -75,7 +75,7 @@ export const useIconStorage = () => {
     }
   };
 
-  const loadIcons = async (): Promise<ExtractedIcon[]> => {
+  const loadIcons = async (): Promise<UnifiedIcon[]> => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -93,7 +93,7 @@ export const useIconStorage = () => {
         return [];
       }
 
-      return (data || []).map((record) => {
+      return (data || []).map((record): UnifiedIcon => {
         // Safely parse dimensions from Json type
         let dimensions = { width: 24, height: 24 };
         if (record.dimensions && typeof record.dimensions === 'object' && record.dimensions !== null) {

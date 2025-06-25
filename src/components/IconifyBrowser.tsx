@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
-import { Search, Grid, List, Download, Eye, Heart, Plus } from 'lucide-react';
+import { Search, Grid, List, Download, Eye, Heart, Plus, Upload } from 'lucide-react';
 import { ExtractedIcon } from './SvgIconManager';
 import { useToast } from '@/hooks/use-toast';
 
@@ -203,6 +203,7 @@ export const IconifyBrowser: React.FC<IconifyBrowserProps> = ({
 
   const handleIconSelect = (icon: ProcessedIcon) => {
     const extractedIcon: ExtractedIcon = {
+      type: 'extracted',
       id: icon.id,
       svgContent: icon.svgContent,
       name: icon.name,
