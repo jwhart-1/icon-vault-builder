@@ -245,20 +245,20 @@ export const IconifyBrowser: React.FC<IconifyBrowserProps> = ({
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 gap-8">
                   {filteredExtractedIcons.map((icon) => (
                     <div
                       key={icon.id}
                       onClick={() => onIconSelected(icon)}
-                      className="cursor-pointer transition-all duration-200 hover:shadow-md bg-slate-50 rounded-lg p-6 text-center hover:bg-blue-50"
+                      className="cursor-pointer transition-all duration-200 hover:shadow-md bg-slate-50 rounded-lg p-8 text-center hover:bg-blue-50"
                     >
-                      <div className="flex items-center justify-center mb-4">
-                        <UnifiedIconDisplay icon={icon} size={256} />
+                      <div className="flex items-center justify-center mb-6">
+                        <UnifiedIconDisplay icon={icon} size={1000} />
                       </div>
-                      <p className="text-sm font-medium text-slate-800 truncate">
+                      <p className="text-lg font-medium text-slate-800 truncate">
                         {icon.name}
                       </p>
-                      <p className="text-xs text-blue-600 mt-1">
+                      <p className="text-sm text-blue-600 mt-2">
                         Extracted
                       </p>
                     </div>
