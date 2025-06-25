@@ -177,6 +177,7 @@ ${clonedGroup.outerHTML}
           const iconSVG = createProperIconSVG(group, bbox, svg, fileName);
           
           extractedIcons.push({
+            type: 'extracted',
             id: `${fileName}-icon-${Date.now()}-${index}`,
             svgContent: iconSVG,
             name: `${fileName.replace('.svg', '')} Icon ${extractedIcons.length + 1}`,

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { ExtractedIcon } from './SvgIconManager';
 import { Loader2 } from 'lucide-react';
@@ -91,6 +92,7 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
           const svgWrapper = createIndividualSVG(item.element.outerHTML, svgContainer);
           if (svgWrapper && svgWrapper.length > 100) { // Ensure meaningful SVG content
             gridIcons.push({
+              type: 'extracted',
               id: `grid-${Date.now()}-${rowIndex}-${colIndex}`,
               svgContent: svgWrapper,
               name: `grid-icon-${rowIndex}-${colIndex}`,
@@ -169,6 +171,7 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
             const svgWrapper = createIndividualSVG(symbol.outerHTML, svgElement);
             if (svgWrapper && svgWrapper.length > 100) {
               icons.push({
+                type: 'extracted',
                 id: `${fileName}-symbol-${index}-${Date.now()}`,
                 svgContent: svgWrapper,
                 name: symbol.getAttribute('id') || `${fileName}-symbol-${index + 1}`,
@@ -200,6 +203,7 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
             const svgWrapper = createIndividualSVG(group.outerHTML, svgElement);
             if (svgWrapper && svgWrapper.length > 100) {
               icons.push({
+                type: 'extracted',
                 id: `${fileName}-def-${index}-${Date.now()}`,
                 svgContent: svgWrapper,
                 name: group.getAttribute('id') || `${fileName}-def-${index + 1}`,
@@ -231,6 +235,7 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
             const svgWrapper = createIndividualSVG(group.outerHTML, svgElement);
             if (svgWrapper && svgWrapper.length > 100) {
               icons.push({
+                type: 'extracted',
                 id: `${fileName}-named-${index}-${Date.now()}`,
                 svgContent: svgWrapper,
                 name: group.getAttribute('id') || group.getAttribute('class') || `${fileName}-named-${index + 1}`,
@@ -263,6 +268,7 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
             const svgWrapper = createIndividualSVG(useEl.outerHTML, svgElement);
             if (svgWrapper && svgWrapper.length > 100) {
               icons.push({
+                type: 'extracted',
                 id: `${fileName}-use-${index}-${Date.now()}`,
                 svgContent: svgWrapper,
                 name: `${fileName}-use-${href.replace('#', '')}-${index + 1}`,
@@ -301,6 +307,7 @@ export const AdvancedIconExtractor: React.FC<AdvancedIconExtractorProps> = ({
         
         if (svgString.length < 100000 && svgString.length > 200) { // Reasonable size limits
           icons.push({
+            type: 'extracted',
             id: `${fileName}-full-${Date.now()}`,
             svgContent: svgString,
             name: fileName.replace('.svg', ''),

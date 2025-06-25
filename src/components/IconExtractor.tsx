@@ -51,7 +51,7 @@ export const IconExtractor: React.FC<IconExtractorProps> = ({
     console.log('Found root SVG element');
 
     // Function to create an icon from an element
-    const createIcon = (element: Element, index: number, elementType: string): ExtractedIcon => {
+    const createIcon = (element: Element, index: number, elementType: string): ExtractedIcon | null => {
       try {
         const svgWrapper = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         
@@ -103,6 +103,7 @@ export const IconExtractor: React.FC<IconExtractorProps> = ({
         });
 
         return {
+          type: 'extracted',
           id: `${fileName.replace('.svg', '')}-${elementType}-${index}-${Date.now()}`,
           svgContent: svgString,
           name: `${fileName.replace('.svg', '')}-${elementType}-${index + 1}`,
@@ -178,6 +179,7 @@ export const IconExtractor: React.FC<IconExtractorProps> = ({
           }
 
           icons.push({
+            type: 'extracted',
             id: `${fileName.replace('.svg', '')}-full-${Date.now()}`,
             svgContent: svgString,
             name: fileName.replace('.svg', ''),

@@ -104,6 +104,7 @@ export const useIconStorage = () => {
         }
 
         return {
+          type: 'extracted' as const,
           id: record.id,
           svgContent: record.svg_content,
           name: record.name,

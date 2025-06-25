@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
 import { SmartIconExtractor } from './SmartIconExtractor';
@@ -67,9 +68,9 @@ export const SvgIconManager = () => {
     });
   };
 
-  const handleIconsExtracted = (icons: any[]) => {
+  const handleIconsExtracted = (icons: ExtractedIcon[]) => {
     // Convert extracted icons to unified format
-    const unifiedIcons: ExtractedIcon[] = icons.map(icon => ({
+    const unifiedIcons: UnifiedIcon[] = icons.map(icon => ({
       ...icon,
       type: 'extracted' as const
     }));
@@ -140,7 +141,8 @@ export const SvgIconManager = () => {
       const response = await fetch(`https://api.iconify.design/${icon.iconifyName}.svg`);
       const svgContent = await response.text();
       
-      const extractedForStorage = {
+      const extractedForStorage: ExtractedIcon = {
+        type: 'extracted',
         id: icon.id,
         svgContent: svgContent,
         name: icon.name,
@@ -168,7 +170,7 @@ export const SvgIconManager = () => {
   };
 
   const handleIconSaved = async (icon: UnifiedIcon) => {
-    let iconForStorage;
+    let iconForStorage: ExtractedIcon;
     
     if (icon.type === 'iconify') {
       // Convert Iconify icon to storage format
@@ -177,6 +179,7 @@ export const SvgIconManager = () => {
         const svgContent = await response.text();
         
         iconForStorage = {
+          type: 'extracted',
           id: icon.id,
           svgContent: svgContent,
           name: icon.name,
