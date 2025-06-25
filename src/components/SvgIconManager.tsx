@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
 import { SmartIconExtractor } from './SmartIconExtractor';
@@ -112,7 +111,7 @@ export const SvgIconManager = () => {
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'browse' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>
               3
             </div>
-            <span>Browse Iconify</span>
+            <span>Browse Icons</span>
           </div>
           <div className="w-8 h-px bg-slate-300"></div>
           <div className={`flex items-center space-x-2 ${currentStep === 'manage' ? 'text-blue-600' : 'text-slate-400'}`}>
@@ -172,7 +171,7 @@ export const SvgIconManager = () => {
       )}
 
       {currentStep === 'browse' && (
-        <IconifyBrowser onIconSelected={handleIconifyIconSelected} />
+        <IconifyBrowser onIconSelected={handleIconifyIconSelected} uploadedFiles={uploadedFiles} />
       )}
 
       {currentStep === 'manage' && (
