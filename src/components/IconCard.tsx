@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Icon } from '@iconify/react';
 import { Download, Eye, Trash2 } from 'lucide-react';
@@ -32,129 +33,32 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
   }
 
   try {
-    // Method 1: Try to extract content from groups first
-    let extractedContent = '';
+    // Clean the SVG content for proper display
+    let cleanSvg = svgContent;
     
-    // Look for group content (most comprehensive)
-    const groupMatches = svgContent.match(/<g[^>]*>(.*?)<\/g>/gs);
-    if (groupMatches && groupMatches.length > 0) {
-      // Take the largest group (likely contains the most content)
-      const largestGroup = groupMatches.reduce((largest, current) => 
-        current.length > largest.length ? current : largest
+    // If it's already a complete SVG, use it directly
+    if (cleanSvg.includes('<svg')) {
+      // Make sure it has proper dimensions
+      cleanSvg = cleanSvg.replace(
+        /<svg([^>]*)>/,
+        `<svg$1 width="${size}" height="${size}" style="display: block;">`
       );
       
-      // Extract content inside the group
-      const groupContentMatch = largestGroup.match(/<g[^>]*>(.*?)<\/g>/s);
-      if (groupContentMatch) {
-        extractedContent = groupContentMatch[1];
-      }
-    }
-    
-    // Method 2: If no groups, extract all drawing elements
-    if (!extractedContent) {
-      const pathMatches = svgContent.match(/<path[^>]*>/g) || [];
-      const circleMatches = svgContent.match(/<circle[^>]*>/g) || [];
-      const rectMatches = svgContent.match(/<rect[^>]*>/g) || [];
-      const lineMatches = svgContent.match(/<line[^>]*>/g) || [];
-      const ellipseMatches = svgContent.match(/<ellipse[^>]*>/g) || [];
-      const polygonMatches = svgContent.match(/<polygon[^>]*>/g) || [];
-      
-      extractedContent = [
-        ...pathMatches,
-        ...circleMatches,
-        ...rectMatches,
-        ...lineMatches,
-        ...ellipseMatches,
-        ...polygonMatches
-      ].join('');
-    }
-    
-    // Method 3: If still nothing, try to extract everything between svg tags
-    if (!extractedContent) {
-      const svgContentMatch = svgContent.match(/<svg[^>]*>(.*?)<\/svg>/s);
-      if (svgContentMatch) {
-        extractedContent = svgContentMatch[1]
-          // Remove defs, metadata, etc.
-          .replace(/<defs[^>]*>.*?<\/defs>/gs, '')
-          .replace(/<metadata[^>]*>.*?<\/metadata>/gs, '')
-          .replace(/<title[^>]*>.*?<\/title>/gs, '')
-          .replace(/<desc[^>]*>.*?<\/desc>/gs, '');
-      }
-    }
-
-    if (!extractedContent.trim()) {
-      // Fallback to colored square
-      return (
-        <div 
-          className="flex items-center justify-center text-white font-bold rounded-lg"
-          style={{ 
-            width: size, 
-            height: size,
-            backgroundColor: `hsl(${name.charCodeAt(0) * 137.5 % 360}, 70%, 50%)`
-          }}
-        >
-          {name.slice(-1).toUpperCase()}
-        </div>
-      );
-    }
-
-    // Process the extracted content to ensure visibility
-    const processedContent = extractedContent
-      // Force stroke styling for line elements
-      .replace(/<(path|circle|rect|line|ellipse|polygon)([^>]*?)>/g, (match, tag, attrs) => {
-        let newAttrs = attrs;
-        
-        // If no fill or stroke specified, add stroke
-        if (!attrs.includes('fill=') && !attrs.includes('stroke=')) {
-          newAttrs += ' fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
-        } else {
-          // Replace currentColor and problematic values
-          newAttrs = newAttrs
-            .replace(/fill="currentColor"/g, 'fill="#000000"')
-            .replace(/stroke="currentColor"/g, 'stroke="#000000"')
-            .replace(/fill="none"/g, 'fill="none"')
-            .replace(/stroke="none"/g, 'stroke="#000000"');
-          
-          // Ensure stroke width for stroke elements
-          if (newAttrs.includes('stroke=') && !newAttrs.includes('stroke-width=')) {
-            newAttrs += ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+      // Ensure visibility by adding stroke to paths without fill
+      cleanSvg = cleanSvg.replace(
+        /<path([^>]*?)>/g,
+        (match, attrs) => {
+          if (!attrs.includes('fill=') && !attrs.includes('stroke=')) {
+            return `<path${attrs} fill="none" stroke="currentColor" stroke-width="2">`;
           }
-          
-          // If fill="none", ensure stroke exists
-          if (newAttrs.includes('fill="none"') && !newAttrs.includes('stroke=')) {
-            newAttrs += ' stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
-          }
+          return match;
         }
-        
-        return `<${tag}${newAttrs}>`;
-      })
-      // Handle groups
-      .replace(/<g([^>]*?)>/g, '<g$1>')
-      // Remove problematic attributes
-      .replace(/opacity="[^"]*"/g, '')
-      .replace(/visibility="[^"]*"/g, '');
-
-    // Get original viewBox or use default
-    const viewBoxMatch = svgContent.match(/viewBox="([^"]*)"/);
-    const originalViewBox = viewBoxMatch ? viewBoxMatch[1] : '0 0 100 100';
-
-    const cleanSvg = `
-      <svg xmlns="http://www.w3.org/2000/svg" 
-           width="${size}" 
-           height="${size}" 
-           viewBox="${originalViewBox}" 
-           fill="none"
-           stroke="#000000"
-           stroke-width="2"
-           stroke-linecap="round"
-           stroke-linejoin="round">
-        ${processedContent}
-      </svg>
-    `;
+      );
+    }
 
     return (
       <div 
-        className="flex items-center justify-center"
+        className="flex items-center justify-center text-slate-800"
         style={{ width: size, height: size }}
         dangerouslySetInnerHTML={{ __html: cleanSvg }}
       />
@@ -162,7 +66,6 @@ const SVGIcon: React.FC<{ svgContent: string; name: string; size?: number }> = (
 
   } catch (error) {
     console.error(`SVG render error for ${name}:`, error);
-    // Fallback to colored square
     return (
       <div 
         className="flex items-center justify-center text-white font-bold rounded-lg"
