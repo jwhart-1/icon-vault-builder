@@ -192,22 +192,22 @@ export const IconifyBrowser: React.FC<IconifyBrowserProps> = ({
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {searchResults.map((iconName: string) => (
                     <div
                       key={iconName}
                       onClick={() => handleIconifyIconSelect(iconName)}
-                      className="cursor-pointer transition-all duration-200 hover:shadow-md bg-slate-50 rounded-lg p-4 text-center hover:bg-blue-50"
+                      className="cursor-pointer transition-all duration-200 hover:shadow-md bg-slate-50 rounded-lg p-6 text-center hover:bg-blue-50"
                     >
-                      <div className="flex items-center justify-center mb-2">
+                      <div className="flex items-center justify-center mb-4">
                         <Icon 
                           icon={iconName} 
-                          width={32} 
-                          height={32}
+                          width={256} 
+                          height={256}
                           className="text-slate-700" 
                         />
                       </div>
-                      <p className="text-xs font-medium text-slate-800 truncate">
+                      <p className="text-sm font-medium text-slate-800 truncate">
                         {iconName.split(':')[1] || iconName}
                       </p>
                     </div>
@@ -245,17 +245,17 @@ export const IconifyBrowser: React.FC<IconifyBrowserProps> = ({
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {filteredExtractedIcons.map((icon) => (
                     <div
                       key={icon.id}
                       onClick={() => onIconSelected(icon)}
-                      className="cursor-pointer transition-all duration-200 hover:shadow-md bg-slate-50 rounded-lg p-4 text-center hover:bg-blue-50"
+                      className="cursor-pointer transition-all duration-200 hover:shadow-md bg-slate-50 rounded-lg p-6 text-center hover:bg-blue-50"
                     >
-                      <div className="flex items-center justify-center mb-2">
-                        <UnifiedIconDisplay icon={icon} size={32} />
+                      <div className="flex items-center justify-center mb-4">
+                        <UnifiedIconDisplay icon={icon} size={256} />
                       </div>
-                      <p className="text-xs font-medium text-slate-800 truncate">
+                      <p className="text-sm font-medium text-slate-800 truncate">
                         {icon.name}
                       </p>
                       <p className="text-xs text-blue-600 mt-1">
