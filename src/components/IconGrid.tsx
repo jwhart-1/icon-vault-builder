@@ -1,11 +1,11 @@
 
 import React from 'react';
-import { ExtractedIcon } from './SvgIconManager';
+import { UnifiedIcon } from './SvgIconManager';
 import { IconCard } from './IconCard';
 
 interface IconGridProps {
-  icons: ExtractedIcon[];
-  onIconSaved: (icon: ExtractedIcon) => void;
+  icons: UnifiedIcon[];
+  onIconSaved: (icon: UnifiedIcon) => void;
   onIconDeleted: (iconId: string) => void;
   showMetadataForms: boolean;
   isLoading?: boolean;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { FileUpload } from './FileUpload';
 import { SmartIconExtractor } from './SmartIconExtractor';
@@ -48,12 +49,7 @@ export const SvgIconManager = () => {
   useEffect(() => {
     const loadSavedIcons = async () => {
       const icons = await loadIcons();
-      // Convert legacy ExtractedIcon format to new unified format
-      const unifiedIcons: UnifiedIcon[] = icons.map(icon => ({
-        ...icon,
-        type: icon.type || 'extracted' as const
-      }));
-      setSavedIcons(unifiedIcons);
+      setSavedIcons(icons);
     };
     loadSavedIcons();
   }, []);
@@ -148,7 +144,7 @@ export const SvgIconManager = () => {
 
       const success = await saveIcon(extractedForStorage);
       if (success) {
-        setSavedIcons(prev => [...prev, unifiedIcon]);
+        setSavedIcons(prev => [...prev, extractedForStorage]);
       }
     } catch (error) {
       console.error('Error saving Iconify icon:', error);
@@ -197,7 +193,7 @@ export const SvgIconManager = () => {
 
     const success = await saveIcon(iconForStorage);
     if (success) {
-      setSavedIcons(prev => [...prev, icon]);
+      setSavedIcons(prev => [...prev, iconForStorage]);
       setExtractedIcons(prev => prev.filter(i => i.id !== icon.id));
     }
   };
